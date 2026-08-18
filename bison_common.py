@@ -329,3 +329,64 @@ def insights_to_html(insights, title):
     <h3 style="margin-bottom:6px;">{title}</h3>
     <ul style="padding-left:20px;">{items}</ul>
     """
+
+
+# -----------------------------------------------------------------------------
+# Supabase sync — one weekly snapshot row per domain, upserted by (domain, week_start).
+#
+# Called separately by bounce_report.py (writes sent + bounced) and
+# reply_rate_report.py (writes sent + replied). Each call only includes the
+# columns it actually has data for, so PostgREST's merge-duplicates upsert
+# updates just those columns and leaves the other script's columns alone —
+# no risk of one report blanking out the other's numbers.
+#
+# Wrapped in try/except: if Supabase is unreachable or misconfigured, this
+# prints a warning and returns quietly. It never raises, so it can never
+# break the existing CSV/email flow.
+# -----------------------------------------------------------------------------
+def push_domain_stats_to_supabase(domain_report, week_start, week_end, numerator_col_name):
+    """
+    domain_report: the domain-level DataFrame from build_mailbox_and_domain_reports()
+    numerator_col_name: 'bounced' or 'replied' — must match total_{numerator_col_name}
+                         column already present in domain_report
+    """
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+
+    if not supabase_url or not supabase_key:
+        print("Supabase env vars not set — skipping Supabase sync.")
+        return
+
+    if domain_report.empty:
+        print("Domain report empty — nothing to sync to Supabase.")
+        return
+
+    payload = []
+    for _, row in domain_report.iterrows():
+        payload.append({
+            "domain": row["domain"],
+            "week_start": week_start,
+            "week_end": week_end,
+            "sent": int(row["total_sent"]),
+            numerator_col_name: int(row[f"total_{numerator_col_name}"]),
+        })
+
+    try:
+        resp = requests.post(
+            f"{supabase_url.rstrip('/')}/rest/v1/domain_weekly_stats",
+            headers={
+                "apikey": supabase_key,
+                "Authorization": f"Bearer {supabase_key}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates",
+            },
+            json=payload,
+            timeout=30,
+        )
+        if resp.status_code >= 300:
+            print(f"Supabase sync error {resp.status_code}: {resp.text}")
+        else:
+            print(f"Synced {len(payload)} domain rows to Supabase ({numerator_col_name}).")
+    except Exception as e:
+        # Never let a Supabase hiccup break the report/email run.
+        print(f"Supabase sync failed (non-fatal, email will still send): {e}")

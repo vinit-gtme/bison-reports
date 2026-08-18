@@ -17,6 +17,7 @@ from bison_common import (
     send_resend_email,
     insights_to_html,
     get_weekly_range,
+    push_domain_stats_to_supabase,
 )
 
 # ---------- CONFIG (all from environment / GitHub Actions secrets) ----------
@@ -79,6 +80,10 @@ def main():
     print("\nInsights:")
     for i in insights:
         print(f" - {i}")
+
+    push_domain_stats_to_supabase(
+        domain_report, START_DATE, END_DATE, numerator_col_name="replied"
+    )
 
     if RESEND_API_KEY and RESEND_FROM_EMAIL and RESEND_TO_EMAIL:
         html = f"""
