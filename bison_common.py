@@ -374,6 +374,7 @@ def push_domain_stats_to_supabase(domain_report, week_start, week_end, numerator
     try:
         resp = requests.post(
             f"{supabase_url.rstrip('/')}/rest/v1/domain_weekly_stats",
+            params={"on_conflict": "domain,week_start"},
             headers={
                 "apikey": supabase_key,
                 "Authorization": f"Bearer {supabase_key}",
