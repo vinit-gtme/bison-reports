@@ -46,6 +46,15 @@ jobs:
         if: steps.guard.outputs.run == 'true'
         run: pip install -r requirements.txt
 
+      - name: Debug — check Supabase secrets are visible
+        if: steps.guard.outputs.run == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ]; then echo "SUPABASE_URL: EMPTY/UNSET"; else echo "SUPABASE_URL: set, length ${#SUPABASE_URL}"; fi
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then echo "SUPABASE_SERVICE_ROLE_KEY: EMPTY/UNSET"; else echo "SUPABASE_SERVICE_ROLE_KEY: set, length ${#SUPABASE_SERVICE_ROLE_KEY}"; fi
+
       - name: Run reply rate report
         if: steps.guard.outputs.run == 'true'
         env:
