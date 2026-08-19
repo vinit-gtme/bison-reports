@@ -23,7 +23,10 @@
 
   .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:16px;}
   @media(max-width:760px){.kpis{grid-template-columns:1fr;}}
-  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;transition:background .2s,border-color .2s;}
+  .kpi.status-red{background:#3a1414;border-color:var(--bad);}
+  .kpi.status-green{background:#123422;border-color:var(--good);}
+  .kpi.status-yellow{background:#3a2e12;border-color:var(--warn);}
   .kpi .label{font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-dim);}
   .kpi-body{display:flex;justify-content:space-between;align-items:flex-end;margin-top:6px;flex-wrap:wrap;gap:10px;}
   .kpi .value{font-family:var(--mono);font-size:1.9rem;font-weight:600;}
@@ -101,9 +104,9 @@
   <div class="panel" style="padding:16px 20px;">
     <h2 style="margin-bottom:8px;">How to read this</h2>
     <p style="font-size:.85rem;color:var(--ink-dim);line-height:1.6;margin:0;">
-      <strong style="color:var(--ink);">Bounce rate</strong> — lower is better. Above 2% on a domain usually means
+      <strong style="color:var(--ink);">Bounce rate</strong>, lower is better. Above 2% on a domain usually means
       it needs pausing, warming up again, or a sending-reputation check.
-      <strong style="color:var(--ink);">Reply rate</strong> — higher is better. Below 1% often points to targeting
+      <strong style="color:var(--ink);">Reply rate</strong>, higher is better. Below 1% often points to targeting
       or copy that needs a refresh. Use <strong style="color:var(--ink);">Week From / Week To</strong> to pick a
       time window, search a <strong style="color:var(--ink);">domain</strong> to isolate it, or set numeric ranges
       to surface outliers (e.g. bounce % min 3 finds every domain currently in trouble). The two stat boxes below
@@ -113,8 +116,8 @@
   </div>
 
   <div class="kpis">
-    <div class="kpi">
-      <div class="label">Avg Bounce Rate — Selected Range</div>
+    <div class="kpi" id="bounce-kpi">
+      <div class="label">Avg Bounce Rate, Selected Range</div>
       <div class="kpi-body">
         <div class="value" id="kpi-bounce">–%</div>
         <div class="compare">
@@ -123,8 +126,8 @@
         </div>
       </div>
     </div>
-    <div class="kpi">
-      <div class="label">Avg Reply Rate — Selected Range</div>
+    <div class="kpi" id="reply-kpi">
+      <div class="label">Avg Reply Rate, Selected Range</div>
       <div class="kpi-body">
         <div class="value" id="kpi-reply">–%</div>
         <div class="compare">
@@ -181,8 +184,13 @@
   </div>
 
   <div class="panel">
-    <h2>Trend — Filtered Domains, By Week</h2>
-    <svg id="trend" viewBox="0 0 1120 230" preserveAspectRatio="none"></svg>
+    <h2>Trend, Filtered Domains, By Week</h2>
+    <div style="position:relative;">
+      <svg id="trend" viewBox="0 0 1120 260" preserveAspectRatio="none"></svg>
+      <div id="tooltip" style="display:none;position:absolute;background:#1c2530;border:1px solid var(--line);
+        border-radius:6px;padding:8px 11px;font-size:.78rem;font-family:var(--mono);pointer-events:none;
+        white-space:nowrap;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,.4);"></div>
+    </div>
     <div class="legend">
       <span><i style="background:var(--bad);"></i>Bounce rate</span>
       <span><i style="background:var(--good);"></i>Reply rate</span>
@@ -191,6 +199,9 @@
 
   <div class="panel">
     <h2>Domain / Week Detail</h2>
+    <p style="font-size:.78rem;color:var(--ink-dim);margin:-8px 0 12px;">
+      Click any column header to sort, click again to reverse order.
+    </p>
     <div class="table-wrap">
       <table id="data-table">
         <thead>
@@ -221,6 +232,8 @@ let ALL_ROWS = [];
 let selectedDomains = new Set();
 let sortKey = "week_start";
 let sortDir = -1; // -1 desc, 1 asc
+let lastWeekBounceNum = null;
+let lastWeekReplyNum = null;
 
 const BOUNCE_THRESHOLD = 2.0;
 const REPLY_THRESHOLD = 1.0;
@@ -233,7 +246,7 @@ async function sb(path) {
   return res.json();
 }
 
-// Supabase caps a single request at 1000 rows by default — page through
+// Supabase caps a single request at 1000 rows by default, page through
 // with the Range header until a page comes back shorter than the page size.
 async function sbAll(path) {
   const pageSize = 1000;
@@ -332,6 +345,7 @@ function getFiltered() {
 
 function drawTrend(rows) {
   const svg = document.getElementById("trend");
+  const tooltip = document.getElementById("tooltip");
   svg.innerHTML = "";
   const byWeek = {};
   rows.forEach(r => {
@@ -346,33 +360,97 @@ function drawTrend(rows) {
     reply_rate: w.sent ? +(w.replied / w.sent * 100).toFixed(2) : 0,
   }));
   if (!weeks.length) {
-    svg.innerHTML = `<text x="560" y="115" fill="var(--ink-dim)" font-size="14" text-anchor="middle">No data for current filters</text>`;
+    svg.innerHTML = `<text x="560" y="130" fill="var(--ink-dim)" font-size="14" text-anchor="middle">No data for current filters</text>`;
+    tooltip.style.display = "none";
     return;
   }
-  const W = 1120, H = 230, padL = 40, padR = 20, padT = 10, padB = 30;
-  const maxVal = Math.max(10, ...weeks.map(r => Math.max(r.bounce_rate, r.reply_rate))) * 1.15;
-  const x = i => padL + (i / Math.max(1, weeks.length - 1)) * (W - padL - padR);
-  const y = v => H - padB - (v / maxVal) * (H - padT - padB);
+
+  const W = 1120, H = 260, padL = 46, padR = 20, padT = 14, padB = 34;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const maxVal = Math.max(2, ...weeks.map(r => Math.max(r.bounce_rate, r.reply_rate))) * 1.2;
+
+  // Single point: still place it inside the plot area (not pinned to the left edge)
+  // so a 1-week selection reads as a point, not a line stretched across the whole width.
+  const x = i => weeks.length === 1
+    ? padL + plotW / 2
+    : padL + (i / (weeks.length - 1)) * plotW;
+  const y = v => padT + plotH - (v / maxVal) * plotH;
+
+  // Y gridlines + % labels, ~5 steps
+  const steps = 5;
+  for (let s = 0; s <= steps; s++) {
+    const val = (maxVal / steps) * s;
+    const gy = y(val);
+    const gline = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    gline.setAttribute("x1", padL); gline.setAttribute("x2", W - padR);
+    gline.setAttribute("y1", gy); gline.setAttribute("y2", gy);
+    gline.setAttribute("stroke", "#1b232d"); gline.setAttribute("stroke-width", "1");
+    svg.appendChild(gline);
+    const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    label.setAttribute("x", padL - 8); label.setAttribute("y", gy + 4);
+    label.setAttribute("fill", "var(--ink-dim)"); label.setAttribute("font-size", "10");
+    label.setAttribute("text-anchor", "end");
+    label.textContent = val.toFixed(1) + "%";
+    svg.appendChild(label);
+  }
+
+  // X-axis line
+  const axis = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  axis.setAttribute("x1", padL); axis.setAttribute("x2", W - padR);
+  axis.setAttribute("y1", padT + plotH); axis.setAttribute("y2", padT + plotH);
+  axis.setAttribute("stroke", "#232c37");
+  svg.appendChild(axis);
+
+  // X labels: show all if few points, else thin them out to avoid overlap
+  const labelEvery = weeks.length <= 10 ? 1 : Math.ceil(weeks.length / 10);
+  weeks.forEach((w, i) => {
+    if (i % labelEvery !== 0 && i !== weeks.length - 1) return;
+    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    t.setAttribute("x", x(i)); t.setAttribute("y", H - 10);
+    t.setAttribute("fill", "var(--ink-dim)"); t.setAttribute("font-size", "10");
+    t.setAttribute("text-anchor", "middle");
+    t.textContent = w.week_start.slice(5); // MM-DD
+    svg.appendChild(t);
+  });
+
   const line = (key, color) => {
-    const pts = weeks.map((r, i) => `${x(i)},${y(r[key])}`).join(" ");
-    const p = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-    p.setAttribute("points", pts); p.setAttribute("fill", "none");
-    p.setAttribute("stroke", color); p.setAttribute("stroke-width", "2");
-    svg.appendChild(p);
-    weeks.forEach((r, i) => {
+    if (weeks.length > 1) {
+      const pts = weeks.map((r, i) => `${x(i)},${y(r[key])}`).join(" ");
+      const p = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      p.setAttribute("points", pts); p.setAttribute("fill", "none");
+      p.setAttribute("stroke", color); p.setAttribute("stroke-width", "2");
+      svg.appendChild(p);
+    }
+  };
+  line("bounce_rate", "var(--bad)");
+  line("reply_rate", "var(--good)");
+
+  // Hover targets: one invisible wider hit-area per week, shows both values in a tooltip.
+  weeks.forEach((w, i) => {
+    [["bounce_rate", "var(--bad)"], ["reply_rate", "var(--good)"]].forEach(([key, color]) => {
       const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      c.setAttribute("cx", x(i)); c.setAttribute("cy", y(r[key])); c.setAttribute("r", "3");
+      c.setAttribute("cx", x(i)); c.setAttribute("cy", y(w[key])); c.setAttribute("r", "3.5");
       c.setAttribute("fill", color);
       svg.appendChild(c);
     });
-  };
-  const axis = document.createElementNS("http://www.w3.org/2000/svg", "line");
-  axis.setAttribute("x1", padL); axis.setAttribute("x2", W - padR);
-  axis.setAttribute("y1", H - padB); axis.setAttribute("y2", H - padB);
-  axis.setAttribute("stroke", "#232c37");
-  svg.appendChild(axis);
-  line("bounce_rate", "var(--bad)");
-  line("reply_rate", "var(--good)");
+    const hit = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    const hitW = weeks.length === 1 ? plotW : plotW / weeks.length;
+    hit.setAttribute("x", x(i) - hitW / 2); hit.setAttribute("y", padT);
+    hit.setAttribute("width", hitW); hit.setAttribute("height", plotH);
+    hit.setAttribute("fill", "transparent");
+    hit.style.cursor = "pointer";
+    hit.addEventListener("mousemove", (e) => {
+      const rect = svg.getBoundingClientRect();
+      tooltip.style.display = "block";
+      tooltip.style.left = (e.clientX - rect.left + 12) + "px";
+      tooltip.style.top = (e.clientY - rect.top - 10) + "px";
+      tooltip.innerHTML = `<div style="color:var(--ink-dim);margin-bottom:4px;">${w.week_start}</div>
+        <div style="color:var(--bad);">Bounce: ${w.bounce_rate}%</div>
+        <div style="color:var(--good);">Reply: ${w.reply_rate}%</div>`;
+    });
+    hit.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+    svg.appendChild(hit);
+  });
 }
 
 function renderTable(rows) {
@@ -396,8 +474,34 @@ function renderTable(rows) {
   });
   document.querySelectorAll("#data-table th").forEach(th => {
     const arrow = th.querySelector(".arrow");
-    arrow.textContent = th.dataset.key === sortKey ? (sortDir === 1 ? "↑" : "↓") : "";
+    if (th.dataset.key === sortKey) {
+      arrow.textContent = sortDir === 1 ? "↑" : "↓";
+      arrow.style.opacity = "1";
+      arrow.style.color = "var(--accent)";
+    } else {
+      arrow.textContent = "↕";
+      arrow.style.opacity = ".35";
+      arrow.style.color = "";
+    }
   });
+}
+
+function classifyBounce(rate, lastWeekRate) {
+  // Red: above threshold OR worse (higher) than last week. Green: everything else.
+  const worseThanLastWeek = lastWeekRate != null && rate > lastWeekRate;
+  if (rate > BOUNCE_THRESHOLD || worseThanLastWeek) return "red";
+  return "green";
+}
+
+function classifyReply(rate, lastWeekRate) {
+  // Red: below threshold AND worse (lower) than last week.
+  // Green: at/above threshold AND better (higher) than last week.
+  // Yellow: everything else (e.g. healthy but flat/declining, or unhealthy but flat/improving).
+  const worseThanLastWeek = lastWeekRate != null && rate < lastWeekRate;
+  const betterThanLastWeek = lastWeekRate != null && rate > lastWeekRate;
+  if (rate < REPLY_THRESHOLD && worseThanLastWeek) return "red";
+  if (rate >= REPLY_THRESHOLD && betterThanLastWeek) return "green";
+  return "yellow";
 }
 
 function applyFilters() {
@@ -406,8 +510,18 @@ function applyFilters() {
   const totalSent = filtered.reduce((s, r) => s + r.sent, 0);
   const totalBounced = filtered.reduce((s, r) => s + r.bounced, 0);
   const totalReplied = filtered.reduce((s, r) => s + r.replied, 0);
-  document.getElementById("kpi-bounce").textContent = (totalSent ? (totalBounced / totalSent * 100).toFixed(2) : "0.00") + "%";
-  document.getElementById("kpi-reply").textContent = (totalSent ? (totalReplied / totalSent * 100).toFixed(2) : "0.00") + "%";
+  const bounceRate = totalSent ? +(totalBounced / totalSent * 100).toFixed(2) : 0;
+  const replyRate = totalSent ? +(totalReplied / totalSent * 100).toFixed(2) : 0;
+  document.getElementById("kpi-bounce").textContent = bounceRate.toFixed(2) + "%";
+  document.getElementById("kpi-reply").textContent = replyRate.toFixed(2) + "%";
+
+  const bounceBox = document.getElementById("bounce-kpi");
+  const replyBox = document.getElementById("reply-kpi");
+  bounceBox.classList.remove("status-red", "status-green", "status-yellow");
+  replyBox.classList.remove("status-red", "status-green", "status-yellow");
+  bounceBox.classList.add("status-" + classifyBounce(bounceRate, lastWeekBounceNum));
+  replyBox.classList.add("status-" + classifyReply(replyRate, lastWeekReplyNum));
+
   drawTrend(filtered);
   renderTable(filtered);
   window._filtered = filtered;
@@ -449,7 +563,7 @@ async function main() {
     populateWeekSelectors(weeks);
     setupDomainSearch(domains);
 
-    // Fixed comparison benchmarks — company-wide, unaffected by the filter panel.
+    // Fixed comparison benchmarks, company-wide, unaffected by the filter panel.
     const companyRate = (rows) => {
       const sent = rows.reduce((s, r) => s + r.sent, 0);
       const bounced = rows.reduce((s, r) => s + r.bounced, 0);
@@ -463,6 +577,8 @@ async function main() {
     const last3moWeeks = weeks.slice(-12); // ~3 months of Sat-Fri weeks
     const lastWeekRate = companyRate(ALL_ROWS.filter(r => r.week_start === lastWeek));
     const last3moRate = companyRate(ALL_ROWS.filter(r => last3moWeeks.includes(r.week_start)));
+    lastWeekBounceNum = parseFloat(lastWeekRate.bounce);
+    lastWeekReplyNum = parseFloat(lastWeekRate.reply);
     document.getElementById("cmp-bounce-week").textContent = lastWeekRate.bounce + "%";
     document.getElementById("cmp-bounce-3mo").textContent = last3moRate.bounce + "%";
     document.getElementById("cmp-reply-week").textContent = lastWeekRate.reply + "%";
