@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Email Health — Explorer</title>
+<title>Infrastructure Health Dashboard</title>
 <style>
   :root{
     --bg:#0d1117; --panel:#141b23; --panel-2:#1a222c; --line:#232c37;
@@ -21,11 +21,14 @@
   a.back:hover{color:var(--accent);}
   .updated{font-family:var(--mono);font-size:.75rem;color:var(--ink-dim);}
 
-  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;}
+  .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:16px;}
   @media(max-width:760px){.kpis{grid-template-columns:1fr;}}
   .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;}
   .kpi .label{font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-dim);}
-  .kpi .value{font-family:var(--mono);font-size:1.7rem;font-weight:600;margin-top:4px;}
+  .kpi-body{display:flex;justify-content:space-between;align-items:flex-end;margin-top:6px;flex-wrap:wrap;gap:10px;}
+  .kpi .value{font-family:var(--mono);font-size:1.9rem;font-weight:600;}
+  .compare{display:flex;gap:16px;font-size:.66rem;color:var(--ink-dim);text-align:right;line-height:1.5;}
+  .compare span{font-family:var(--mono);color:var(--ink);font-size:.85rem;display:block;}
 
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:16px;}
   .panel h2{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-dim);margin:0 0 14px;}
@@ -88,17 +91,48 @@
   <header>
     <div>
       <a class="back" href="index.html">&larr; Overview</a>
-      <h1 style="margin-top:4px;">Email Health — Explorer</h1>
+      <h1 style="margin-top:4px;">Infrastructure Health Dashboard</h1>
     </div>
     <div class="updated" id="updated">loading…</div>
   </header>
 
   <div id="setup-notice"></div>
 
+  <div class="panel" style="padding:16px 20px;">
+    <h2 style="margin-bottom:8px;">How to read this</h2>
+    <p style="font-size:.85rem;color:var(--ink-dim);line-height:1.6;margin:0;">
+      <strong style="color:var(--ink);">Bounce rate</strong> — lower is better. Above 2% on a domain usually means
+      it needs pausing, warming up again, or a sending-reputation check.
+      <strong style="color:var(--ink);">Reply rate</strong> — higher is better. Below 1% often points to targeting
+      or copy that needs a refresh. Use <strong style="color:var(--ink);">Week From / Week To</strong> to pick a
+      time window, search a <strong style="color:var(--ink);">domain</strong> to isolate it, or set numeric ranges
+      to surface outliers (e.g. bounce % min 3 finds every domain currently in trouble). The two stat boxes below
+      always show your currently selected range on the left, with last week and the trailing 3-month average
+      alongside for quick comparison.
+    </p>
+  </div>
+
   <div class="kpis">
-    <div class="kpi"><div class="label">Rows Matching Filters</div><div class="value" id="kpi-rows">–</div></div>
-    <div class="kpi"><div class="label">Avg Bounce Rate (Filtered)</div><div class="value" id="kpi-bounce">–%</div></div>
-    <div class="kpi"><div class="label">Avg Reply Rate (Filtered)</div><div class="value" id="kpi-reply">–%</div></div>
+    <div class="kpi">
+      <div class="label">Avg Bounce Rate — Selected Range</div>
+      <div class="kpi-body">
+        <div class="value" id="kpi-bounce">–%</div>
+        <div class="compare">
+          <div>Last week<br><span id="cmp-bounce-week">–%</span></div>
+          <div>3-mo avg<br><span id="cmp-bounce-3mo">–%</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kpi">
+      <div class="label">Avg Reply Rate — Selected Range</div>
+      <div class="kpi-body">
+        <div class="value" id="kpi-reply">–%</div>
+        <div class="compare">
+          <div>Last week<br><span id="cmp-reply-week">–%</span></div>
+          <div>3-mo avg<br><span id="cmp-reply-3mo">–%</span></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="panel">
@@ -179,8 +213,8 @@
 
 <script>
 // ---- Fill these in once ----
-const SUPABASE_URL = "https://tuccoyvmlfhqpapbbjta.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1Y2NveXZtbGZocXBhcGJianRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0MDI1OTcsImV4cCI6MjEwMTk3ODU5N30.vEE3ec977LVhOrD8559afwGtyU_QP1Hm91K5vbcQo_g"; // anon/public key only, never service_role
+const SUPABASE_URL = "https://tuccoyvmlfhqpapbbjta.supabase.co";   // e.g. https://tuccoyvmlfhqpapbbjta.supabase.co
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1Y2NveXZtbGZocXBhcGJianRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0MDI1OTcsImV4cCI6MjEwMTk3ODU5N30.vEE3ec977LVhOrD8559afwGtyU_QP1Hm91K5vbcQo_g"; // Project Settings -> API -> anon/public key (NOT service_role)
 // -----------------------------
 
 let ALL_ROWS = [];
@@ -188,12 +222,38 @@ let selectedDomains = new Set();
 let sortKey = "week_start";
 let sortDir = -1; // -1 desc, 1 asc
 
+const BOUNCE_THRESHOLD = 2.0;
+const REPLY_THRESHOLD = 1.0;
+
 async function sb(path) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
   });
   if (!res.ok) throw new Error(`Supabase error ${res.status}: ${await res.text()}`);
   return res.json();
+}
+
+// Supabase caps a single request at 1000 rows by default — page through
+// with the Range header until a page comes back shorter than the page size.
+async function sbAll(path) {
+  const pageSize = 1000;
+  let from = 0;
+  let all = [];
+  while (true) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        Range: `${from}-${from + pageSize - 1}`,
+      },
+    });
+    if (!res.ok && res.status !== 206) throw new Error(`Supabase error ${res.status}: ${await res.text()}`);
+    const chunk = await res.json();
+    all = all.concat(chunk);
+    if (chunk.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
 }
 
 function uniqueSorted(arr) { return [...new Set(arr)].sort(); }
@@ -329,9 +389,9 @@ function renderTable(rows) {
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${r.week_start}</td><td>${r.domain}</td><td class="num">${r.sent.toLocaleString()}</td>
       <td class="num">${r.bounced.toLocaleString()}</td>
-      <td class="num" style="color:${r.bounce_rate > 2 ? 'var(--bad)' : 'var(--ink)'}">${r.bounce_rate}%</td>
+      <td class="num" style="color:${r.bounce_rate > BOUNCE_THRESHOLD ? 'var(--bad)' : 'var(--ink)'}">${r.bounce_rate}%</td>
       <td class="num">${r.replied.toLocaleString()}</td>
-      <td class="num" style="color:${r.reply_rate < 10 ? 'var(--warn)' : 'var(--good)'}">${r.reply_rate}%</td>`;
+      <td class="num" style="color:${r.reply_rate < REPLY_THRESHOLD ? 'var(--warn)' : 'var(--good)'}">${r.reply_rate}%</td>`;
     tbody.appendChild(tr);
   });
   document.querySelectorAll("#data-table th").forEach(th => {
@@ -343,7 +403,6 @@ function renderTable(rows) {
 function applyFilters() {
   const filtered = getFiltered();
   document.getElementById("result-count").textContent = `${filtered.length.toLocaleString()} rows`;
-  document.getElementById("kpi-rows").textContent = filtered.length.toLocaleString();
   const totalSent = filtered.reduce((s, r) => s + r.sent, 0);
   const totalBounced = filtered.reduce((s, r) => s + r.bounced, 0);
   const totalReplied = filtered.reduce((s, r) => s + r.replied, 0);
@@ -381,7 +440,7 @@ async function main() {
     return;
   }
   try {
-    ALL_ROWS = await sb("domain_weekly_stats?select=week_start,week_end,domain,sent,bounced,replied,bounce_rate,reply_rate&order=week_start.asc");
+    ALL_ROWS = await sbAll("domain_weekly_stats?select=week_start,week_end,domain,sent,bounced,replied,bounce_rate,reply_rate&order=week_start.asc");
     if (!ALL_ROWS.length) { document.getElementById("updated").textContent = "no data yet"; return; }
 
     document.getElementById("updated").textContent = `${ALL_ROWS.length.toLocaleString()} rows loaded`;
@@ -389,6 +448,25 @@ async function main() {
     const domains = uniqueSorted(ALL_ROWS.map(r => r.domain));
     populateWeekSelectors(weeks);
     setupDomainSearch(domains);
+
+    // Fixed comparison benchmarks — company-wide, unaffected by the filter panel.
+    const companyRate = (rows) => {
+      const sent = rows.reduce((s, r) => s + r.sent, 0);
+      const bounced = rows.reduce((s, r) => s + r.bounced, 0);
+      const replied = rows.reduce((s, r) => s + r.replied, 0);
+      return {
+        bounce: sent ? (bounced / sent * 100).toFixed(2) : "0.00",
+        reply: sent ? (replied / sent * 100).toFixed(2) : "0.00",
+      };
+    };
+    const lastWeek = weeks[weeks.length - 1];
+    const last3moWeeks = weeks.slice(-12); // ~3 months of Sat-Fri weeks
+    const lastWeekRate = companyRate(ALL_ROWS.filter(r => r.week_start === lastWeek));
+    const last3moRate = companyRate(ALL_ROWS.filter(r => last3moWeeks.includes(r.week_start)));
+    document.getElementById("cmp-bounce-week").textContent = lastWeekRate.bounce + "%";
+    document.getElementById("cmp-bounce-3mo").textContent = last3moRate.bounce + "%";
+    document.getElementById("cmp-reply-week").textContent = lastWeekRate.reply + "%";
+    document.getElementById("cmp-reply-3mo").textContent = last3moRate.reply + "%";
 
     ["week-from", "week-to", "min-sent", "bounce-min", "bounce-max", "reply-min", "reply-max"]
       .forEach(id => document.getElementById(id).addEventListener("input", applyFilters));
