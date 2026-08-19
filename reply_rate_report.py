@@ -75,7 +75,7 @@ def main():
     insights = generate_insights(
         domain_report, month_cols,
         numerator_col_name="replied", rate_col_name="reply_rate_%",
-        metric_label="reply rate", good_direction="high", healthy_threshold=10.0,
+        metric_label="reply rate", good_direction="high", healthy_threshold=1.0,
     )
     print("\nInsights:")
     for i in insights:
