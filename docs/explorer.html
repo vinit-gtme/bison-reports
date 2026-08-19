@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Email Health — Explorer</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#141b23; --panel-2:#1a222c; --line:#232c37;
+    --ink:#e6edf3; --ink-dim:#7d8a99;
+    --good:#2fbf71; --warn:#e8a33d; --bad:#e0483e; --accent:#5b8def;
+    --mono:"JetBrains Mono","SF Mono",Consolas,monospace;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);padding:28px 20px 60px;}
+  .wrap{max-width:1180px;margin:0 auto;}
+  header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px;}
+  h1{font-size:1.1rem;font-weight:600;margin:0;}
+  a.back{color:var(--ink-dim);font-size:.8rem;text-decoration:none;}
+  a.back:hover{color:var(--accent);}
+  .updated{font-family:var(--mono);font-size:.75rem;color:var(--ink-dim);}
+
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;}
+  @media(max-width:760px){.kpis{grid-template-columns:1fr;}}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;}
+  .kpi .label{font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-dim);}
+  .kpi .value{font-family:var(--mono);font-size:1.7rem;font-weight:600;margin-top:4px;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:16px;}
+  .panel h2{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-dim);margin:0 0 14px;}
+
+  .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;align-items:end;}
+  .field label{display:block;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);margin-bottom:6px;}
+  .field select,.field input{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
+    color:var(--ink);padding:7px 9px;font-family:var(--sans);font-size:.85rem;
+  }
+  .field input:focus,.field select:focus{outline:none;border-color:var(--accent);}
+  .range-pair{display:flex;gap:6px;}
+
+  .domain-box{position:relative;}
+  #domain-search{width:100%;}
+  #domain-list{
+    display:none;position:absolute;z-index:5;top:100%;left:0;right:0;margin-top:4px;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
+    max-height:220px;overflow-y:auto;
+  }
+  #domain-list.open{display:block;}
+  #domain-list div{padding:7px 10px;font-size:.83rem;cursor:pointer;}
+  #domain-list div:hover{background:#232e3a;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .chip{
+    background:#1c2836;border:1px solid var(--line);border-radius:20px;padding:3px 10px 3px 12px;
+    font-size:.78rem;display:flex;align-items:center;gap:6px;
+  }
+  .chip button{background:none;border:none;color:var(--ink-dim);cursor:pointer;font-size:.9rem;line-height:1;padding:0;}
+  .chip button:hover{color:var(--bad);}
+
+  .actions{display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px;}
+  button.btn{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+    padding:8px 14px;border-radius:6px;font-size:.82rem;cursor:pointer;
+  }
+  button.btn:hover{border-color:var(--accent);}
+  button.btn.primary{background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:600;}
+  .result-count{font-size:.78rem;color:var(--ink-dim);font-family:var(--mono);}
+
+  #trend{width:100%;height:230px;display:block;}
+  .legend{display:flex;gap:18px;margin-top:8px;font-size:.78rem;color:var(--ink-dim);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .legend i{width:10px;height:10px;border-radius:2px;display:inline-block;}
+
+  table{width:100%;border-collapse:collapse;font-size:.85rem;}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  th{color:var(--ink-dim);font-weight:500;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;user-select:none;}
+  th:hover{color:var(--ink);}
+  th .arrow{opacity:.4;margin-left:3px;}
+  td.num,th.num{text-align:right;font-family:var(--mono);}
+  .table-wrap{overflow-x:auto;max-height:520px;overflow-y:auto;}
+  .empty{color:var(--ink-dim);font-size:.85rem;padding:24px 0;text-align:center;}
+  .setup{background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:20px 22px;font-size:.85rem;color:var(--ink-dim);line-height:1.6;}
+  .setup code{color:var(--ink);background:#1c2530;padding:1px 6px;border-radius:4px;font-family:var(--mono);font-size:.82rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <a class="back" href="index.html">&larr; Overview</a>
+      <h1 style="margin-top:4px;">Email Health — Explorer</h1>
+    </div>
+    <div class="updated" id="updated">loading…</div>
+  </header>
+
+  <div id="setup-notice"></div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="label">Rows Matching Filters</div><div class="value" id="kpi-rows">–</div></div>
+    <div class="kpi"><div class="label">Avg Bounce Rate (Filtered)</div><div class="value" id="kpi-bounce">–%</div></div>
+    <div class="kpi"><div class="label">Avg Reply Rate (Filtered)</div><div class="value" id="kpi-reply">–%</div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Filters</h2>
+    <div class="filters">
+      <div class="field">
+        <label>Week From</label>
+        <select id="week-from"></select>
+      </div>
+      <div class="field">
+        <label>Week To</label>
+        <select id="week-to"></select>
+      </div>
+      <div class="field">
+        <label>Min Sent</label>
+        <input type="number" id="min-sent" placeholder="0">
+      </div>
+      <div class="field">
+        <label>Bounce Rate % (min / max)</label>
+        <div class="range-pair">
+          <input type="number" id="bounce-min" placeholder="min" step="0.1">
+          <input type="number" id="bounce-max" placeholder="max" step="0.1">
+        </div>
+      </div>
+      <div class="field">
+        <label>Reply Rate % (min / max)</label>
+        <div class="range-pair">
+          <input type="number" id="reply-min" placeholder="min" step="0.1">
+          <input type="number" id="reply-max" placeholder="max" step="0.1">
+        </div>
+      </div>
+      <div class="field domain-box">
+        <label>Domain Search</label>
+        <input type="text" id="domain-search" placeholder="Type to find & add domains…" autocomplete="off">
+        <div id="domain-list"></div>
+      </div>
+    </div>
+    <div class="chips" id="domain-chips"></div>
+    <div class="actions">
+      <button class="btn" id="reset-btn">Reset all filters</button>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <span class="result-count" id="result-count"></span>
+        <button class="btn primary" id="export-btn">Export filtered CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Trend — Filtered Domains, By Week</h2>
+    <svg id="trend" viewBox="0 0 1120 230" preserveAspectRatio="none"></svg>
+    <div class="legend">
+      <span><i style="background:var(--bad);"></i>Bounce rate</span>
+      <span><i style="background:var(--good);"></i>Reply rate</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Domain / Week Detail</h2>
+    <div class="table-wrap">
+      <table id="data-table">
+        <thead>
+          <tr>
+            <th data-key="week_start">Week <span class="arrow"></span></th>
+            <th data-key="domain">Domain <span class="arrow"></span></th>
+            <th class="num" data-key="sent">Sent <span class="arrow"></span></th>
+            <th class="num" data-key="bounced">Bounced <span class="arrow"></span></th>
+            <th class="num" data-key="bounce_rate">Bounce % <span class="arrow"></span></th>
+            <th class="num" data-key="replied">Replied <span class="arrow"></span></th>
+            <th class="num" data-key="reply_rate">Reply % <span class="arrow"></span></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="empty" id="table-empty" style="display:none;">No rows match the current filters.</div>
+  </div>
+</div>
+
+<script>
+// ---- Fill these in once ----
+const SUPABASE_URL = "https://tuccoyvmlfhqpapbbjta.supabase.co";
+const SUPABASE_ANON_KEY = "sb_secret_8TADkAZiNg6j4xKwwRVwHg_icJdsSGv"; // anon/public key only, never service_role
+// -----------------------------
+
+let ALL_ROWS = [];
+let selectedDomains = new Set();
+let sortKey = "week_start";
+let sortDir = -1; // -1 desc, 1 asc
+
+async function sb(path) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+  });
+  if (!res.ok) throw new Error(`Supabase error ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+function uniqueSorted(arr) { return [...new Set(arr)].sort(); }
+
+function populateWeekSelectors(weeks) {
+  const fromSel = document.getElementById("week-from");
+  const toSel = document.getElementById("week-to");
+  [fromSel, toSel].forEach(sel => sel.innerHTML = "");
+  weeks.forEach(w => {
+    fromSel.appendChild(new Option(w, w));
+    toSel.appendChild(new Option(w, w));
+  });
+  fromSel.value = weeks[0];
+  toSel.value = weeks[weeks.length - 1];
+}
+
+function renderChips() {
+  const box = document.getElementById("domain-chips");
+  box.innerHTML = "";
+  selectedDomains.forEach(d => {
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    chip.innerHTML = `${d} <button data-d="${d}">&times;</button>`;
+    chip.querySelector("button").onclick = () => { selectedDomains.delete(d); renderChips(); applyFilters(); };
+    box.appendChild(chip);
+  });
+}
+
+function setupDomainSearch(allDomains) {
+  const input = document.getElementById("domain-search");
+  const list = document.getElementById("domain-list");
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    list.innerHTML = "";
+    if (!q) { list.classList.remove("open"); return; }
+    const matches = allDomains.filter(d => d.includes(q) && !selectedDomains.has(d)).slice(0, 15);
+    matches.forEach(d => {
+      const item = document.createElement("div");
+      item.textContent = d;
+      item.onclick = () => {
+        selectedDomains.add(d);
+        input.value = "";
+        list.classList.remove("open");
+        renderChips();
+        applyFilters();
+      };
+      list.appendChild(item);
+    });
+    list.classList.toggle("open", matches.length > 0);
+  });
+  document.addEventListener("click", e => {
+    if (!e.target.closest(".domain-box")) list.classList.remove("open");
+  });
+}
+
+function getFiltered() {
+  const weekFrom = document.getElementById("week-from").value;
+  const weekTo = document.getElementById("week-to").value;
+  const minSent = parseFloat(document.getElementById("min-sent").value) || 0;
+  const bounceMin = parseFloat(document.getElementById("bounce-min").value);
+  const bounceMax = parseFloat(document.getElementById("bounce-max").value);
+  const replyMin = parseFloat(document.getElementById("reply-min").value);
+  const replyMax = parseFloat(document.getElementById("reply-max").value);
+
+  return ALL_ROWS.filter(r => {
+    if (r.week_start < weekFrom || r.week_start > weekTo) return false;
+    if (r.sent < minSent) return false;
+    if (!isNaN(bounceMin) && r.bounce_rate < bounceMin) return false;
+    if (!isNaN(bounceMax) && r.bounce_rate > bounceMax) return false;
+    if (!isNaN(replyMin) && r.reply_rate < replyMin) return false;
+    if (!isNaN(replyMax) && r.reply_rate > replyMax) return false;
+    if (selectedDomains.size > 0 && !selectedDomains.has(r.domain)) return false;
+    return true;
+  });
+}
+
+function drawTrend(rows) {
+  const svg = document.getElementById("trend");
+  svg.innerHTML = "";
+  const byWeek = {};
+  rows.forEach(r => {
+    byWeek[r.week_start] ??= { week_start: r.week_start, sent: 0, bounced: 0, replied: 0 };
+    byWeek[r.week_start].sent += r.sent;
+    byWeek[r.week_start].bounced += r.bounced;
+    byWeek[r.week_start].replied += r.replied;
+  });
+  const weeks = Object.values(byWeek).sort((a, b) => a.week_start.localeCompare(b.week_start)).map(w => ({
+    week_start: w.week_start,
+    bounce_rate: w.sent ? +(w.bounced / w.sent * 100).toFixed(2) : 0,
+    reply_rate: w.sent ? +(w.replied / w.sent * 100).toFixed(2) : 0,
+  }));
+  if (!weeks.length) {
+    svg.innerHTML = `<text x="560" y="115" fill="var(--ink-dim)" font-size="14" text-anchor="middle">No data for current filters</text>`;
+    return;
+  }
+  const W = 1120, H = 230, padL = 40, padR = 20, padT = 10, padB = 30;
+  const maxVal = Math.max(10, ...weeks.map(r => Math.max(r.bounce_rate, r.reply_rate))) * 1.15;
+  const x = i => padL + (i / Math.max(1, weeks.length - 1)) * (W - padL - padR);
+  const y = v => H - padB - (v / maxVal) * (H - padT - padB);
+  const line = (key, color) => {
+    const pts = weeks.map((r, i) => `${x(i)},${y(r[key])}`).join(" ");
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+    p.setAttribute("points", pts); p.setAttribute("fill", "none");
+    p.setAttribute("stroke", color); p.setAttribute("stroke-width", "2");
+    svg.appendChild(p);
+    weeks.forEach((r, i) => {
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("cx", x(i)); c.setAttribute("cy", y(r[key])); c.setAttribute("r", "3");
+      c.setAttribute("fill", color);
+      svg.appendChild(c);
+    });
+  };
+  const axis = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  axis.setAttribute("x1", padL); axis.setAttribute("x2", W - padR);
+  axis.setAttribute("y1", H - padB); axis.setAttribute("y2", H - padB);
+  axis.setAttribute("stroke", "#232c37");
+  svg.appendChild(axis);
+  line("bounce_rate", "var(--bad)");
+  line("reply_rate", "var(--good)");
+}
+
+function renderTable(rows) {
+  const sorted = [...rows].sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if (av < bv) return -1 * sortDir;
+    if (av > bv) return 1 * sortDir;
+    return 0;
+  });
+  const tbody = document.querySelector("#data-table tbody");
+  tbody.innerHTML = "";
+  document.getElementById("table-empty").style.display = sorted.length ? "none" : "block";
+  sorted.slice(0, 500).forEach(r => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.week_start}</td><td>${r.domain}</td><td class="num">${r.sent.toLocaleString()}</td>
+      <td class="num">${r.bounced.toLocaleString()}</td>
+      <td class="num" style="color:${r.bounce_rate > 2 ? 'var(--bad)' : 'var(--ink)'}">${r.bounce_rate}%</td>
+      <td class="num">${r.replied.toLocaleString()}</td>
+      <td class="num" style="color:${r.reply_rate < 10 ? 'var(--warn)' : 'var(--good)'}">${r.reply_rate}%</td>`;
+    tbody.appendChild(tr);
+  });
+  document.querySelectorAll("#data-table th").forEach(th => {
+    const arrow = th.querySelector(".arrow");
+    arrow.textContent = th.dataset.key === sortKey ? (sortDir === 1 ? "↑" : "↓") : "";
+  });
+}
+
+function applyFilters() {
+  const filtered = getFiltered();
+  document.getElementById("result-count").textContent = `${filtered.length.toLocaleString()} rows`;
+  document.getElementById("kpi-rows").textContent = filtered.length.toLocaleString();
+  const totalSent = filtered.reduce((s, r) => s + r.sent, 0);
+  const totalBounced = filtered.reduce((s, r) => s + r.bounced, 0);
+  const totalReplied = filtered.reduce((s, r) => s + r.replied, 0);
+  document.getElementById("kpi-bounce").textContent = (totalSent ? (totalBounced / totalSent * 100).toFixed(2) : "0.00") + "%";
+  document.getElementById("kpi-reply").textContent = (totalSent ? (totalReplied / totalSent * 100).toFixed(2) : "0.00") + "%";
+  drawTrend(filtered);
+  renderTable(filtered);
+  window._filtered = filtered;
+}
+
+function exportCsv() {
+  const rows = window._filtered || [];
+  if (!rows.length) return;
+  const headers = ["week_start", "week_end", "domain", "sent", "bounced", "bounce_rate", "replied", "reply_rate"];
+  const csv = [headers.join(",")].concat(
+    rows.map(r => headers.map(h => r[h]).join(","))
+  ).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "filtered_email_health.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function main() {
+  if (SUPABASE_URL.startsWith("YOUR_") || SUPABASE_ANON_KEY.startsWith("YOUR_")) {
+    document.getElementById("setup-notice").innerHTML = `
+      <div class="setup">
+        Not connected yet. Set <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code>
+        at the top of the script (Project Settings → API → anon/public key). Also ensure a
+        read-only RLS policy allows <code>SELECT</code> on <code>domain_weekly_stats</code> for the anon role.
+      </div>`;
+    document.getElementById("updated").textContent = "not connected";
+    return;
+  }
+  try {
+    ALL_ROWS = await sb("domain_weekly_stats?select=week_start,week_end,domain,sent,bounced,replied,bounce_rate,reply_rate&order=week_start.asc");
+    if (!ALL_ROWS.length) { document.getElementById("updated").textContent = "no data yet"; return; }
+
+    document.getElementById("updated").textContent = `${ALL_ROWS.length.toLocaleString()} rows loaded`;
+    const weeks = uniqueSorted(ALL_ROWS.map(r => r.week_start));
+    const domains = uniqueSorted(ALL_ROWS.map(r => r.domain));
+    populateWeekSelectors(weeks);
+    setupDomainSearch(domains);
+
+    ["week-from", "week-to", "min-sent", "bounce-min", "bounce-max", "reply-min", "reply-max"]
+      .forEach(id => document.getElementById(id).addEventListener("input", applyFilters));
+
+    document.getElementById("reset-btn").onclick = () => {
+      populateWeekSelectors(weeks);
+      ["min-sent", "bounce-min", "bounce-max", "reply-min", "reply-max"].forEach(id => document.getElementById(id).value = "");
+      selectedDomains.clear();
+      renderChips();
+      applyFilters();
+    };
+    document.getElementById("export-btn").onclick = exportCsv;
+
+    document.querySelectorAll("#data-table th").forEach(th => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.key;
+        sortDir = (sortKey === key) ? -sortDir : -1;
+        sortKey = key;
+        applyFilters();
+      });
+    });
+
+    applyFilters();
+  } catch (e) {
+    document.getElementById("updated").textContent = "error loading data";
+    console.error(e);
+  }
+}
+
+main();
+</script>
+</body>
+</html>
