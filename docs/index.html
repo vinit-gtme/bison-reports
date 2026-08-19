@@ -103,7 +103,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // -----------------------------------------------------
 
 const BOUNCE_THRESHOLD = 2.0;
-const REPLY_THRESHOLD = 10.0;
+const REPLY_THRESHOLD = 1.0;
 
 async function sb(path) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -114,6 +114,29 @@ async function sb(path) {
   });
   if (!res.ok) throw new Error(`Supabase error ${res.status}: ${await res.text()}`);
   return res.json();
+}
+
+// Supabase caps a single request at 1000 rows by default — page through
+// with the Range header until a page comes back shorter than the page size.
+async function sbAll(path) {
+  const pageSize = 1000;
+  let from = 0;
+  let all = [];
+  while (true) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        Range: `${from}-${from + pageSize - 1}`,
+      },
+    });
+    if (!res.ok && res.status !== 206) throw new Error(`Supabase error ${res.status}: ${await res.text()}`);
+    const chunk = await res.json();
+    all = all.concat(chunk);
+    if (chunk.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
 }
 
 function statusColor(value, threshold, goodDirection) {
@@ -186,7 +209,7 @@ async function main() {
   }
 
   try {
-    const all = await sb("domain_weekly_stats?select=week_start,domain,sent,bounced,replied,bounce_rate,reply_rate&order=week_start.asc");
+    const all = await sbAll("domain_weekly_stats?select=week_start,domain,sent,bounced,replied,bounce_rate,reply_rate&order=week_start.asc");
     if (!all.length) {
       document.getElementById("updated").textContent = "no data yet";
       return;
