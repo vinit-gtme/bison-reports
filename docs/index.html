@@ -31,17 +31,15 @@
   @media(max-width:560px){.lights{grid-template-columns:1fr;}}
   .light{
     background:var(--panel); border:1px solid var(--line); border-radius:10px;
-    padding:20px 22px; position:relative; overflow:hidden;
+    padding:20px 22px; position:relative; overflow:hidden; transition:background .2s,border-color .2s;
   }
-  .light::before{
-    content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
-    background:var(--dot,var(--ink-dim));
-  }
+  .light.status-red{background:#3a1414;border-color:var(--bad);}
+  .light.status-green{background:#123422;border-color:var(--good);}
+  .light.status-yellow{background:#3a2e12;border-color:var(--warn);}
   .light .label{font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-dim);}
   .light .value{font-family:var(--mono); font-size:2.4rem; font-weight:600; margin-top:6px; display:flex; align-items:baseline; gap:10px;}
   .light .value .unit{font-size:1.1rem; color:var(--ink-dim); font-weight:400;}
   .light .sub{font-size:.78rem; color:var(--ink-dim); margin-top:4px;}
-  .dot{width:9px;height:9px;border-radius:50%;background:var(--dot,var(--ink-dim));display:inline-block;}
 
   .panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:22px; margin-bottom:16px;}
   .panel h2{font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-dim); margin:0 0 16px;}
@@ -82,12 +80,12 @@
   </div>
 
   <div class="panel">
-    <h2>Trend — Company-Wide, By Week</h2>
+    <h2>Trend, Company-Wide, By Week</h2>
     <svg id="trend" viewBox="0 0 900 220" preserveAspectRatio="none"></svg>
   </div>
 
   <div class="panel">
-    <h2>Needs Attention — Domains Above 2% Bounce (This Week)</h2>
+    <h2>Needs Attention, Domains Above 2% Bounce (This Week)</h2>
     <table id="attention-table">
       <thead><tr><th>Domain</th><th class="num">Sent</th><th class="num">Bounced</th><th class="num">Bounce Rate</th></tr></thead>
       <tbody></tbody>
@@ -116,7 +114,7 @@ async function sb(path) {
   return res.json();
 }
 
-// Supabase caps a single request at 1000 rows by default — page through
+// Supabase caps a single request at 1000 rows by default, page through
 // with the Range header until a page comes back shorter than the page size.
 async function sbAll(path) {
   const pageSize = 1000;
@@ -139,9 +137,22 @@ async function sbAll(path) {
   return all;
 }
 
-function statusColor(value, threshold, goodDirection) {
-  const ok = goodDirection === "low" ? value <= threshold : value >= threshold;
-  return ok ? "var(--good)" : (Math.abs(value - threshold) < threshold * 0.25 ? "var(--warn)" : "var(--bad)");
+function classifyBounce(rate, lastWeekRate) {
+  // Red: above threshold OR worse (higher) than last week. Green: everything else.
+  const worseThanLastWeek = lastWeekRate != null && rate > lastWeekRate;
+  if (rate > BOUNCE_THRESHOLD || worseThanLastWeek) return "red";
+  return "green";
+}
+
+function classifyReply(rate, lastWeekRate) {
+  // Red: below threshold AND worse (lower) than last week.
+  // Green: at/above threshold AND better (higher) than last week.
+  // Yellow: everything else.
+  const worseThanLastWeek = lastWeekRate != null && rate < lastWeekRate;
+  const betterThanLastWeek = lastWeekRate != null && rate > lastWeekRate;
+  if (rate < REPLY_THRESHOLD && worseThanLastWeek) return "red";
+  if (rate >= REPLY_THRESHOLD && betterThanLastWeek) return "green";
+  return "yellow";
 }
 
 function drawTrend(rows) {
@@ -201,7 +212,7 @@ async function main() {
       <div class="setup">
         Not connected yet. Open <code>docs/index.html</code> and set <code>SUPABASE_URL</code> and
         <code>SUPABASE_ANON_KEY</code> at the top of the script block (the anon/public key from
-        Project Settings → API — never the service_role key). Also make sure a read-only
+        Project Settings → API, never the service_role key). Also make sure a read-only
         RLS policy allows <code>SELECT</code> on <code>domain_weekly_stats</code> for the anon role.
       </div>`;
     document.getElementById("updated").textContent = "not connected";
@@ -230,11 +241,6 @@ async function main() {
     document.getElementById("bounce-sub").textContent = `${totalBounced.toLocaleString()} of ${totalSent.toLocaleString()} sent`;
     document.getElementById("reply-sub").textContent = `${totalReplied.toLocaleString()} of ${totalSent.toLocaleString()} sent`;
 
-    const bounceColor = statusColor(overallBounce, BOUNCE_THRESHOLD, "low");
-    const replyColor = statusColor(overallReply, REPLY_THRESHOLD, "high");
-    document.getElementById("bounce-light").style.setProperty("--dot", bounceColor);
-    document.getElementById("reply-light").style.setProperty("--dot", replyColor);
-
     // trend: aggregate by week across all domains
     const byWeek = {};
     all.forEach(r => {
@@ -249,6 +255,15 @@ async function main() {
       reply_rate: w.sent ? +(w.replied / w.sent * 100).toFixed(2) : 0,
     }));
     drawTrend(trendRows);
+
+    // Status coloring: this week vs. the week immediately before it (null if no prior week exists yet).
+    const prevWeek = trendRows.length >= 2 ? trendRows[trendRows.length - 2] : null;
+    const bounceBox = document.getElementById("bounce-light");
+    const replyBox = document.getElementById("reply-light");
+    bounceBox.classList.remove("status-red", "status-green", "status-yellow");
+    replyBox.classList.remove("status-red", "status-green", "status-yellow");
+    bounceBox.classList.add("status-" + classifyBounce(overallBounce, prevWeek ? prevWeek.bounce_rate : null));
+    replyBox.classList.add("status-" + classifyReply(overallReply, prevWeek ? prevWeek.reply_rate : null));
 
     // attention list
     const attn = thisWeek.filter(r => r.bounce_rate > BOUNCE_THRESHOLD).sort((a, b) => b.bounce_rate - a.bounce_rate).slice(0, 10);
