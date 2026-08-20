@@ -36,6 +36,14 @@
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:16px;}
   .panel h2{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-dim);margin:0 0 14px;}
 
+  .view-toggle-row{display:flex;gap:6px;margin-bottom:16px;}
+  .view-btn{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--ink-dim);
+    padding:8px 16px;border-radius:6px;font-size:.82rem;cursor:pointer;font-weight:500;
+  }
+  .view-btn.active{background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:600;}
+  .view-btn:disabled{opacity:.5;cursor:wait;}
+
   .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;align-items:end;}
   .field label{display:block;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);margin-bottom:6px;}
   .field select,.field input{
@@ -53,8 +61,9 @@
     max-height:220px;overflow-y:auto;
   }
   #domain-list.open{display:block;}
-  #domain-list div{padding:7px 10px;font-size:.83rem;cursor:pointer;}
+  #domain-list div{padding:7px 10px;font-size:.83rem;cursor:pointer;display:flex;justify-content:space-between;gap:8px;}
   #domain-list div:hover{background:#232e3a;}
+  #domain-list .tag{color:var(--ink-dim);font-size:.7rem;text-transform:uppercase;}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
   .chip{
     background:#1c2836;border:1px solid var(--line);border-radius:20px;padding:3px 10px 3px 12px;
@@ -72,7 +81,7 @@
   button.btn.primary{background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:600;}
   .result-count{font-size:.78rem;color:var(--ink-dim);font-family:var(--mono);}
 
-  #trend{width:100%;height:230px;display:block;}
+  #trend{width:100%;height:260px;display:block;}
   .legend{display:flex;gap:18px;margin-top:8px;font-size:.78rem;color:var(--ink-dim);}
   .legend span{display:inline-flex;align-items:center;gap:6px;}
   .legend i{width:10px;height:10px;border-radius:2px;display:inline-block;}
@@ -81,7 +90,7 @@
   th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap;}
   th{color:var(--ink-dim);font-weight:500;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;user-select:none;}
   th:hover{color:var(--ink);}
-  th .arrow{opacity:.4;margin-left:3px;}
+  th .arrow{margin-left:3px;}
   td.num,th.num{text-align:right;font-family:var(--mono);}
   .table-wrap{overflow-x:auto;max-height:520px;overflow-y:auto;}
   .empty{color:var(--ink-dim);font-size:.85rem;padding:24px 0;text-align:center;}
@@ -108,10 +117,11 @@
       it needs pausing, warming up again, or a sending-reputation check.
       <strong style="color:var(--ink);">Reply rate</strong>, higher is better. Below 1% often points to targeting
       or copy that needs a refresh. Use <strong style="color:var(--ink);">Week From / Week To</strong> to pick a
-      time window, search a <strong style="color:var(--ink);">domain</strong> to isolate it, or set numeric ranges
+      time window, search a <strong style="color:var(--ink);">domain or mailbox</strong> to isolate it, or set numeric ranges
       to surface outliers (e.g. bounce % min 3 finds every domain currently in trouble). The two stat boxes below
       always show your currently selected range on the left, with last week and the trailing 3-month average
-      alongside for quick comparison.
+      alongside for quick comparison. Switch between <strong style="color:var(--ink);">Domain</strong> and
+      <strong style="color:var(--ink);">Mailbox</strong> view below to change how granular the table gets.
     </p>
   </div>
 
@@ -140,6 +150,10 @@
 
   <div class="panel">
     <h2>Filters</h2>
+    <div class="view-toggle-row">
+      <button class="view-btn active" id="btn-domain-view" data-mode="domain">Domain View</button>
+      <button class="view-btn" id="btn-mailbox-view" data-mode="mailbox">Mailbox View</button>
+    </div>
     <div class="filters">
       <div class="field">
         <label>Week From</label>
@@ -168,7 +182,7 @@
         </div>
       </div>
       <div class="field domain-box">
-        <label>Domain Search</label>
+        <label id="search-label">Domain Search</label>
         <input type="text" id="domain-search" placeholder="Type to find & add domains…" autocomplete="off">
         <div id="domain-list"></div>
       </div>
@@ -198,23 +212,13 @@
   </div>
 
   <div class="panel">
-    <h2>Domain / Week Detail</h2>
+    <h2 id="table-title">Domain / Week Detail</h2>
     <p style="font-size:.78rem;color:var(--ink-dim);margin:-8px 0 12px;">
       Click any column header to sort, click again to reverse order.
     </p>
     <div class="table-wrap">
       <table id="data-table">
-        <thead>
-          <tr>
-            <th data-key="week_start">Week <span class="arrow"></span></th>
-            <th data-key="domain">Domain <span class="arrow"></span></th>
-            <th class="num" data-key="sent">Sent <span class="arrow"></span></th>
-            <th class="num" data-key="bounced">Bounced <span class="arrow"></span></th>
-            <th class="num" data-key="bounce_rate">Bounce % <span class="arrow"></span></th>
-            <th class="num" data-key="replied">Replied <span class="arrow"></span></th>
-            <th class="num" data-key="reply_rate">Reply % <span class="arrow"></span></th>
-          </tr>
-        </thead>
+        <thead id="table-head"></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -228,15 +232,41 @@ const SUPABASE_URL = "https://tuccoyvmlfhqpapbbjta.supabase.co";   // e.g. https
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1Y2NveXZtbGZocXBhcGJianRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0MDI1OTcsImV4cCI6MjEwMTk3ODU5N30.vEE3ec977LVhOrD8559afwGtyU_QP1Hm91K5vbcQo_g"; // Project Settings -> API -> anon/public key (NOT service_role)
 // -----------------------------
 
+const BOUNCE_THRESHOLD = 2.0;
+const REPLY_THRESHOLD = 1.0;
+
+let viewMode = "domain";
+let DOMAIN_ROWS = [];
+let MAILBOX_ROWS = null; // lazy-loaded on first toggle to Mailbox View
 let ALL_ROWS = [];
-let selectedDomains = new Set();
+let selectedChips = new Set(); // entries like "domain:foo.com" or "email:jim@foo.com"
 let sortKey = "week_start";
 let sortDir = -1; // -1 desc, 1 asc
 let lastWeekBounceNum = null;
 let lastWeekReplyNum = null;
 
-const BOUNCE_THRESHOLD = 2.0;
-const REPLY_THRESHOLD = 1.0;
+const COLUMNS = {
+  domain: [
+    { key: "week_start", label: "Week" },
+    { key: "domain", label: "Domain" },
+    { key: "sent", label: "Sent", num: true },
+    { key: "bounced", label: "Bounced", num: true },
+    { key: "bounce_rate", label: "Bounce %", num: true, rule: "bounce" },
+    { key: "replied", label: "Replied", num: true },
+    { key: "reply_rate", label: "Reply %", num: true, rule: "reply" },
+  ],
+  mailbox: [
+    { key: "week_start", label: "Week" },
+    { key: "email", label: "Mailbox" },
+    { key: "domain", label: "Domain" },
+    { key: "sent", label: "Sent", num: true },
+    { key: "bounced", label: "Bounced", num: true },
+    { key: "bounce_rate", label: "Bounce %", num: true, rule: "bounce" },
+    { key: "replied", label: "Replied", num: true },
+    { key: "reply_rate", label: "Reply %", num: true, rule: "reply" },
+    { key: "daily_limit", label: "Daily Limit", num: true },
+  ],
+};
 
 async function sb(path) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -274,40 +304,50 @@ function uniqueSorted(arr) { return [...new Set(arr)].sort(); }
 function populateWeekSelectors(weeks) {
   const fromSel = document.getElementById("week-from");
   const toSel = document.getElementById("week-to");
+  const prevFrom = fromSel.value, prevTo = toSel.value;
   [fromSel, toSel].forEach(sel => sel.innerHTML = "");
   weeks.forEach(w => {
     fromSel.appendChild(new Option(w, w));
     toSel.appendChild(new Option(w, w));
   });
-  fromSel.value = weeks[0];
-  toSel.value = weeks[weeks.length - 1];
+  fromSel.value = weeks.includes(prevFrom) ? prevFrom : weeks[0];
+  toSel.value = weeks.includes(prevTo) ? prevTo : weeks[weeks.length - 1];
 }
 
 function renderChips() {
   const box = document.getElementById("domain-chips");
   box.innerHTML = "";
-  selectedDomains.forEach(d => {
-    const chip = document.createElement("div");
-    chip.className = "chip";
-    chip.innerHTML = `${d} <button data-d="${d}">&times;</button>`;
-    chip.querySelector("button").onclick = () => { selectedDomains.delete(d); renderChips(); applyFilters(); };
-    box.appendChild(chip);
+  selectedChips.forEach(chip => {
+    const [type, value] = chip.split(":");
+    const div = document.createElement("div");
+    div.className = "chip";
+    div.innerHTML = `${value}${type === "email" ? " <span style='color:var(--ink-dim);font-size:.7rem;'>(mailbox)</span>" : ""} <button data-chip="${chip}">&times;</button>`;
+    div.querySelector("button").onclick = () => { selectedChips.delete(chip); renderChips(); applyFilters(); };
+    box.appendChild(div);
   });
 }
 
-function setupDomainSearch(allDomains) {
+function setupDomainSearch() {
   const input = document.getElementById("domain-search");
   const list = document.getElementById("domain-list");
   input.addEventListener("input", () => {
     const q = input.value.trim().toLowerCase();
     list.innerHTML = "";
     if (!q) { list.classList.remove("open"); return; }
-    const matches = allDomains.filter(d => d.includes(q) && !selectedDomains.has(d)).slice(0, 15);
-    matches.forEach(d => {
+
+    const domains = uniqueSorted(ALL_ROWS.map(r => r.domain)).filter(d => d.includes(q));
+    const emails = viewMode === "mailbox" ? uniqueSorted(ALL_ROWS.map(r => r.email)).filter(e => e.includes(q)) : [];
+
+    const matches = [
+      ...domains.filter(d => !selectedChips.has(`domain:${d}`)).map(d => ({ type: "domain", value: d })),
+      ...emails.filter(e => !selectedChips.has(`email:${e}`)).map(e => ({ type: "email", value: e })),
+    ].slice(0, 15);
+
+    matches.forEach(m => {
       const item = document.createElement("div");
-      item.textContent = d;
+      item.innerHTML = `<span>${m.value}</span><span class="tag">${m.type}</span>`;
       item.onclick = () => {
-        selectedDomains.add(d);
+        selectedChips.add(`${m.type}:${m.value}`);
         input.value = "";
         list.classList.remove("open");
         renderChips();
@@ -331,6 +371,9 @@ function getFiltered() {
   const replyMin = parseFloat(document.getElementById("reply-min").value);
   const replyMax = parseFloat(document.getElementById("reply-max").value);
 
+  const domainChips = [...selectedChips].filter(c => c.startsWith("domain:")).map(c => c.slice(7));
+  const emailChips = [...selectedChips].filter(c => c.startsWith("email:")).map(c => c.slice(6));
+
   return ALL_ROWS.filter(r => {
     if (r.week_start < weekFrom || r.week_start > weekTo) return false;
     if (r.sent < minSent) return false;
@@ -338,9 +381,27 @@ function getFiltered() {
     if (!isNaN(bounceMax) && r.bounce_rate > bounceMax) return false;
     if (!isNaN(replyMin) && r.reply_rate < replyMin) return false;
     if (!isNaN(replyMax) && r.reply_rate > replyMax) return false;
-    if (selectedDomains.size > 0 && !selectedDomains.has(r.domain)) return false;
+    if (selectedChips.size > 0) {
+      const domainMatch = domainChips.includes(r.domain);
+      const emailMatch = viewMode === "mailbox" && emailChips.includes(r.email);
+      if (!domainMatch && !emailMatch) return false;
+    }
     return true;
   });
+}
+
+function classifyBounce(rate, lastWeekRate) {
+  const worseThanLastWeek = lastWeekRate != null && rate > lastWeekRate;
+  if (rate > BOUNCE_THRESHOLD || worseThanLastWeek) return "red";
+  return "green";
+}
+
+function classifyReply(rate, lastWeekRate) {
+  const worseThanLastWeek = lastWeekRate != null && rate < lastWeekRate;
+  const betterThanLastWeek = lastWeekRate != null && rate > lastWeekRate;
+  if (rate < REPLY_THRESHOLD && worseThanLastWeek) return "red";
+  if (rate >= REPLY_THRESHOLD && betterThanLastWeek) return "green";
+  return "yellow";
 }
 
 function drawTrend(rows) {
@@ -369,14 +430,9 @@ function drawTrend(rows) {
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const maxVal = Math.max(2, ...weeks.map(r => Math.max(r.bounce_rate, r.reply_rate))) * 1.2;
 
-  // Single point: still place it inside the plot area (not pinned to the left edge)
-  // so a 1-week selection reads as a point, not a line stretched across the whole width.
-  const x = i => weeks.length === 1
-    ? padL + plotW / 2
-    : padL + (i / (weeks.length - 1)) * plotW;
+  const x = i => weeks.length === 1 ? padL + plotW / 2 : padL + (i / (weeks.length - 1)) * plotW;
   const y = v => padT + plotH - (v / maxVal) * plotH;
 
-  // Y gridlines + % labels, ~5 steps
   const steps = 5;
   for (let s = 0; s <= steps; s++) {
     const val = (maxVal / steps) * s;
@@ -394,14 +450,12 @@ function drawTrend(rows) {
     svg.appendChild(label);
   }
 
-  // X-axis line
   const axis = document.createElementNS("http://www.w3.org/2000/svg", "line");
   axis.setAttribute("x1", padL); axis.setAttribute("x2", W - padR);
   axis.setAttribute("y1", padT + plotH); axis.setAttribute("y2", padT + plotH);
   axis.setAttribute("stroke", "#232c37");
   svg.appendChild(axis);
 
-  // X labels: show all if few points, else thin them out to avoid overlap
   const labelEvery = weeks.length <= 10 ? 1 : Math.ceil(weeks.length / 10);
   weeks.forEach((w, i) => {
     if (i % labelEvery !== 0 && i !== weeks.length - 1) return;
@@ -409,7 +463,7 @@ function drawTrend(rows) {
     t.setAttribute("x", x(i)); t.setAttribute("y", H - 10);
     t.setAttribute("fill", "var(--ink-dim)"); t.setAttribute("font-size", "10");
     t.setAttribute("text-anchor", "middle");
-    t.textContent = w.week_start.slice(5); // MM-DD
+    t.textContent = w.week_start.slice(5);
     svg.appendChild(t);
   });
 
@@ -425,7 +479,6 @@ function drawTrend(rows) {
   line("bounce_rate", "var(--bad)");
   line("reply_rate", "var(--good)");
 
-  // Hover targets: one invisible wider hit-area per week, shows both values in a tooltip.
   weeks.forEach((w, i) => {
     [["bounce_rate", "var(--bad)"], ["reply_rate", "var(--good)"]].forEach(([key, color]) => {
       const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
@@ -453,25 +506,27 @@ function drawTrend(rows) {
   });
 }
 
-function renderTable(rows) {
-  const sorted = [...rows].sort((a, b) => {
-    const av = a[sortKey], bv = b[sortKey];
-    if (av < bv) return -1 * sortDir;
-    if (av > bv) return 1 * sortDir;
-    return 0;
+function renderHead() {
+  const thead = document.getElementById("table-head");
+  const tr = document.createElement("tr");
+  COLUMNS[viewMode].forEach(col => {
+    const th = document.createElement("th");
+    th.dataset.key = col.key;
+    if (col.num) th.classList.add("num");
+    th.innerHTML = `${col.label} <span class="arrow"></span>`;
+    tr.appendChild(th);
   });
-  const tbody = document.querySelector("#data-table tbody");
-  tbody.innerHTML = "";
-  document.getElementById("table-empty").style.display = sorted.length ? "none" : "block";
-  sorted.slice(0, 500).forEach(r => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${r.week_start}</td><td>${r.domain}</td><td class="num">${r.sent.toLocaleString()}</td>
-      <td class="num">${r.bounced.toLocaleString()}</td>
-      <td class="num" style="color:${r.bounce_rate > BOUNCE_THRESHOLD ? 'var(--bad)' : 'var(--ink)'}">${r.bounce_rate}%</td>
-      <td class="num">${r.replied.toLocaleString()}</td>
-      <td class="num" style="color:${r.reply_rate < REPLY_THRESHOLD ? 'var(--warn)' : 'var(--good)'}">${r.reply_rate}%</td>`;
-    tbody.appendChild(tr);
-  });
+  thead.innerHTML = "";
+  thead.appendChild(tr);
+
+  if (!COLUMNS[viewMode].some(c => c.key === sortKey)) {
+    sortKey = "week_start";
+    sortDir = -1;
+  }
+  updateSortArrows();
+}
+
+function updateSortArrows() {
   document.querySelectorAll("#data-table th").forEach(th => {
     const arrow = th.querySelector(".arrow");
     if (th.dataset.key === sortKey) {
@@ -486,22 +541,43 @@ function renderTable(rows) {
   });
 }
 
-function classifyBounce(rate, lastWeekRate) {
-  // Red: above threshold OR worse (higher) than last week. Green: everything else.
-  const worseThanLastWeek = lastWeekRate != null && rate > lastWeekRate;
-  if (rate > BOUNCE_THRESHOLD || worseThanLastWeek) return "red";
-  return "green";
-}
+function renderTable(rows) {
+  const sorted = [...rows].sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (av < bv) return -1 * sortDir;
+    if (av > bv) return 1 * sortDir;
+    return 0;
+  });
+  const tbody = document.querySelector("#data-table tbody");
+  tbody.innerHTML = "";
+  document.getElementById("table-empty").style.display = sorted.length ? "none" : "block";
 
-function classifyReply(rate, lastWeekRate) {
-  // Red: below threshold AND worse (lower) than last week.
-  // Green: at/above threshold AND better (higher) than last week.
-  // Yellow: everything else (e.g. healthy but flat/declining, or unhealthy but flat/improving).
-  const worseThanLastWeek = lastWeekRate != null && rate < lastWeekRate;
-  const betterThanLastWeek = lastWeekRate != null && rate > lastWeekRate;
-  if (rate < REPLY_THRESHOLD && worseThanLastWeek) return "red";
-  if (rate >= REPLY_THRESHOLD && betterThanLastWeek) return "green";
-  return "yellow";
+  sorted.slice(0, 500).forEach(r => {
+    const tr = document.createElement("tr");
+    COLUMNS[viewMode].forEach(col => {
+      const td = document.createElement("td");
+      if (col.num) td.classList.add("num");
+      let val = r[col.key];
+      if (col.key === "daily_limit") {
+        td.textContent = (val == null) ? "N/A" : val.toLocaleString();
+      } else if (col.rule === "bounce") {
+        td.textContent = val + "%";
+        td.style.color = val > BOUNCE_THRESHOLD ? "var(--bad)" : "var(--ink)";
+      } else if (col.rule === "reply") {
+        td.textContent = val + "%";
+        td.style.color = val < REPLY_THRESHOLD ? "var(--warn)" : "var(--good)";
+      } else if (col.num) {
+        td.textContent = (val || 0).toLocaleString();
+      } else {
+        td.textContent = val;
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  updateSortArrows();
 }
 
 function applyFilters() {
@@ -530,16 +606,75 @@ function applyFilters() {
 function exportCsv() {
   const rows = window._filtered || [];
   if (!rows.length) return;
-  const headers = ["week_start", "week_end", "domain", "sent", "bounced", "bounce_rate", "replied", "reply_rate"];
+  const headers = COLUMNS[viewMode].map(c => c.key).concat(["week_end"]);
   const csv = [headers.join(",")].concat(
-    rows.map(r => headers.map(h => r[h]).join(","))
+    rows.map(r => headers.map(h => r[h] ?? "").join(","))
   ).join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = "filtered_email_health.csv";
+  a.href = url; a.download = `filtered_${viewMode}_email_health.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function computeBenchmarks() {
+  const weeks = uniqueSorted(DOMAIN_ROWS.map(r => r.week_start));
+  if (!weeks.length) return;
+  const companyRate = (rows) => {
+    const sent = rows.reduce((s, r) => s + r.sent, 0);
+    const bounced = rows.reduce((s, r) => s + r.bounced, 0);
+    const replied = rows.reduce((s, r) => s + r.replied, 0);
+    return {
+      bounce: sent ? (bounced / sent * 100).toFixed(2) : "0.00",
+      reply: sent ? (replied / sent * 100).toFixed(2) : "0.00",
+    };
+  };
+  const lastWeek = weeks[weeks.length - 1];
+  const last3moWeeks = weeks.slice(-12);
+  const lastWeekRate = companyRate(DOMAIN_ROWS.filter(r => r.week_start === lastWeek));
+  const last3moRate = companyRate(DOMAIN_ROWS.filter(r => last3moWeeks.includes(r.week_start)));
+  lastWeekBounceNum = parseFloat(lastWeekRate.bounce);
+  lastWeekReplyNum = parseFloat(lastWeekRate.reply);
+  document.getElementById("cmp-bounce-week").textContent = lastWeekRate.bounce + "%";
+  document.getElementById("cmp-bounce-3mo").textContent = last3moRate.bounce + "%";
+  document.getElementById("cmp-reply-week").textContent = lastWeekRate.reply + "%";
+  document.getElementById("cmp-reply-3mo").textContent = last3moRate.reply + "%";
+}
+
+async function switchView(mode) {
+  if (mode === viewMode) return;
+  const domainBtn = document.getElementById("btn-domain-view");
+  const mailboxBtn = document.getElementById("btn-mailbox-view");
+
+  if (mode === "mailbox" && MAILBOX_ROWS === null) {
+    mailboxBtn.disabled = true;
+    mailboxBtn.textContent = "Loading…";
+    try {
+      MAILBOX_ROWS = await sbAll("mailbox_weekly_stats?select=week_start,week_end,mailbox_id,email,domain,sent,bounced,replied,bounce_rate,reply_rate,daily_limit&order=week_start.asc");
+    } catch (e) {
+      console.error(e);
+      mailboxBtn.disabled = false;
+      mailboxBtn.textContent = "Mailbox View";
+      alert("Could not load mailbox-level data. Check that mailbox_weekly_stats exists and RLS allows anon SELECT.");
+      return;
+    }
+    mailboxBtn.disabled = false;
+    mailboxBtn.textContent = "Mailbox View";
+  }
+
+  viewMode = mode;
+  ALL_ROWS = mode === "domain" ? DOMAIN_ROWS : MAILBOX_ROWS;
+  domainBtn.classList.toggle("active", mode === "domain");
+  mailboxBtn.classList.toggle("active", mode === "mailbox");
+  document.getElementById("table-title").textContent = mode === "domain" ? "Domain / Week Detail" : "Mailbox / Week Detail";
+  document.getElementById("search-label").textContent = mode === "domain" ? "Domain Search" : "Domain or Mailbox Search";
+  document.getElementById("domain-search").placeholder = mode === "domain" ? "Type to find & add domains…" : "Type to find & add domains or mailboxes…";
+
+  const weeks = uniqueSorted(ALL_ROWS.map(r => r.week_start));
+  populateWeekSelectors(weeks);
+  renderHead();
+  applyFilters();
 }
 
 async function main() {
@@ -548,62 +683,50 @@ async function main() {
       <div class="setup">
         Not connected yet. Set <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code>
         at the top of the script (Project Settings → API → anon/public key). Also ensure a
-        read-only RLS policy allows <code>SELECT</code> on <code>domain_weekly_stats</code> for the anon role.
+        read-only RLS policy allows <code>SELECT</code> on <code>domain_weekly_stats</code> and
+        <code>mailbox_weekly_stats</code> for the anon role.
       </div>`;
     document.getElementById("updated").textContent = "not connected";
     return;
   }
   try {
-    ALL_ROWS = await sbAll("domain_weekly_stats?select=week_start,week_end,domain,sent,bounced,replied,bounce_rate,reply_rate&order=week_start.asc");
+    DOMAIN_ROWS = await sbAll("domain_weekly_stats?select=week_start,week_end,domain,sent,bounced,replied,bounce_rate,reply_rate&order=week_start.asc");
+    ALL_ROWS = DOMAIN_ROWS;
     if (!ALL_ROWS.length) { document.getElementById("updated").textContent = "no data yet"; return; }
 
     document.getElementById("updated").textContent = `${ALL_ROWS.length.toLocaleString()} rows loaded`;
     const weeks = uniqueSorted(ALL_ROWS.map(r => r.week_start));
-    const domains = uniqueSorted(ALL_ROWS.map(r => r.domain));
     populateWeekSelectors(weeks);
-    setupDomainSearch(domains);
-
-    // Fixed comparison benchmarks, company-wide, unaffected by the filter panel.
-    const companyRate = (rows) => {
-      const sent = rows.reduce((s, r) => s + r.sent, 0);
-      const bounced = rows.reduce((s, r) => s + r.bounced, 0);
-      const replied = rows.reduce((s, r) => s + r.replied, 0);
-      return {
-        bounce: sent ? (bounced / sent * 100).toFixed(2) : "0.00",
-        reply: sent ? (replied / sent * 100).toFixed(2) : "0.00",
-      };
-    };
-    const lastWeek = weeks[weeks.length - 1];
-    const last3moWeeks = weeks.slice(-12); // ~3 months of Sat-Fri weeks
-    const lastWeekRate = companyRate(ALL_ROWS.filter(r => r.week_start === lastWeek));
-    const last3moRate = companyRate(ALL_ROWS.filter(r => last3moWeeks.includes(r.week_start)));
-    lastWeekBounceNum = parseFloat(lastWeekRate.bounce);
-    lastWeekReplyNum = parseFloat(lastWeekRate.reply);
-    document.getElementById("cmp-bounce-week").textContent = lastWeekRate.bounce + "%";
-    document.getElementById("cmp-bounce-3mo").textContent = last3moRate.bounce + "%";
-    document.getElementById("cmp-reply-week").textContent = lastWeekRate.reply + "%";
-    document.getElementById("cmp-reply-3mo").textContent = last3moRate.reply + "%";
+    setupDomainSearch();
+    computeBenchmarks();
+    renderHead();
 
     ["week-from", "week-to", "min-sent", "bounce-min", "bounce-max", "reply-min", "reply-max"]
       .forEach(id => document.getElementById(id).addEventListener("input", applyFilters));
 
     document.getElementById("reset-btn").onclick = () => {
-      populateWeekSelectors(weeks);
+      const w = uniqueSorted(ALL_ROWS.map(r => r.week_start));
+      populateWeekSelectors(w);
+      document.getElementById("week-from").value = w[0];
+      document.getElementById("week-to").value = w[w.length - 1];
       ["min-sent", "bounce-min", "bounce-max", "reply-min", "reply-max"].forEach(id => document.getElementById(id).value = "");
-      selectedDomains.clear();
+      selectedChips.clear();
       renderChips();
       applyFilters();
     };
     document.getElementById("export-btn").onclick = exportCsv;
 
-    document.querySelectorAll("#data-table th").forEach(th => {
-      th.addEventListener("click", () => {
-        const key = th.dataset.key;
-        sortDir = (sortKey === key) ? -sortDir : -1;
-        sortKey = key;
-        applyFilters();
-      });
+    document.getElementById("table-head").addEventListener("click", (e) => {
+      const th = e.target.closest("th");
+      if (!th) return;
+      const key = th.dataset.key;
+      sortDir = (sortKey === key) ? -sortDir : -1;
+      sortKey = key;
+      applyFilters();
     });
+
+    document.getElementById("btn-domain-view").addEventListener("click", () => switchView("domain"));
+    document.getElementById("btn-mailbox-view").addEventListener("click", () => switchView("mailbox"));
 
     applyFilters();
   } catch (e) {
