@@ -391,3 +391,65 @@ def push_domain_stats_to_supabase(domain_report, week_start, week_end, numerator
     except Exception as e:
         # Never let a Supabase hiccup break the report/email run.
         print(f"Supabase sync failed (non-fatal, email will still send): {e}")
+
+
+# -----------------------------------------------------------------------------
+# Mailbox-level Supabase sync — same pattern as push_domain_stats_to_supabase,
+# one row per mailbox per week, upserted by (mailbox_id, week_start). Powers
+# the Domain/Mailbox toggle in explorer.html. Also stores each mailbox's
+# CURRENT daily_limit at sync time, useful later for the throttle feature.
+# -----------------------------------------------------------------------------
+def push_mailbox_stats_to_supabase(mailbox_report, week_start, week_end, numerator_col_name,
+                                    mailbox_limits=None):
+    """
+    mailbox_report: the mailbox-level DataFrame from build_mailbox_and_domain_reports()
+                    (has columns mailbox_id, email, domain, total_sent, total_{numerator})
+    mailbox_limits: optional dict {mailbox_id: current_daily_limit} to include a
+                     daily_limit snapshot column alongside this week's stats
+    """
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+
+    if not supabase_url or not supabase_key:
+        print("Supabase env vars not set — skipping mailbox-level Supabase sync.")
+        return
+
+    if mailbox_report.empty:
+        print("Mailbox report empty — nothing to sync to Supabase.")
+        return
+
+    payload = []
+    for _, row in mailbox_report.iterrows():
+        mbox_id = int(row["mailbox_id"])
+        record = {
+            "mailbox_id": mbox_id,
+            "email": row["email"],
+            "domain": row["domain"],
+            "week_start": week_start,
+            "week_end": week_end,
+            "sent": int(row["total_sent"]),
+            numerator_col_name: int(row[f"total_{numerator_col_name}"]),
+        }
+        if mailbox_limits and mbox_id in mailbox_limits:
+            record["daily_limit"] = mailbox_limits[mbox_id]
+        payload.append(record)
+
+    try:
+        resp = requests.post(
+            f"{supabase_url.rstrip('/')}/rest/v1/mailbox_weekly_stats",
+            params={"on_conflict": "mailbox_id,week_start"},
+            headers={
+                "apikey": supabase_key,
+                "Authorization": f"Bearer {supabase_key}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates",
+            },
+            json=payload,
+            timeout=60,
+        )
+        if resp.status_code >= 300:
+            print(f"Supabase mailbox sync error {resp.status_code}: {resp.text}")
+        else:
+            print(f"Synced {len(payload)} mailbox rows to Supabase ({numerator_col_name}).")
+    except Exception as e:
+        print(f"Supabase mailbox sync failed (non-fatal, email will still send): {e}")

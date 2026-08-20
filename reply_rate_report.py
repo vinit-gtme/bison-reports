@@ -18,6 +18,7 @@ from bison_common import (
     insights_to_html,
     get_weekly_range,
     push_domain_stats_to_supabase,
+    push_mailbox_stats_to_supabase,
 )
 
 # ---------- CONFIG (all from environment / GitHub Actions secrets) ----------
@@ -46,6 +47,7 @@ def main():
     print("Fetching all mailboxes...")
     mailboxes = client.get_all_sender_emails()
     print(f"Unique mailboxes: {len(mailboxes)}")
+    mailbox_limits = {m.get("id"): m.get("daily_limit") for m in mailboxes if m.get("daily_limit") is not None}
 
     print(f"Fetching Sent/Replied stats for {len(mailboxes)} mailboxes...")
     records, failed = fetch_all_mailbox_metrics(
@@ -83,6 +85,9 @@ def main():
 
     push_domain_stats_to_supabase(
         domain_report, START_DATE, END_DATE, numerator_col_name="replied"
+    )
+    push_mailbox_stats_to_supabase(
+        mailbox_report, START_DATE, END_DATE, numerator_col_name="replied", mailbox_limits=mailbox_limits
     )
 
     if RESEND_API_KEY and RESEND_FROM_EMAIL and RESEND_TO_EMAIL:
