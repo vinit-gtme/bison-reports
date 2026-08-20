@@ -276,13 +276,36 @@ async function sb(path) {
   return res.json();
 }
 
-// Supabase caps a single request at 1000 rows by default, page through
-// with the Range header until a page comes back shorter than the page size.
+// Supabase caps a single request at 1000 rows by default. Fetch the first page
+// with an exact count, then fire every remaining page concurrently (instead of
+// one-at-a-time) since wall-clock time here is dominated by network latency,
+// not server work — parallel requests finish in roughly one round-trip.
 async function sbAll(path) {
   const pageSize = 1000;
-  let from = 0;
-  let all = [];
-  while (true) {
+  const firstRes = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      Range: `0-${pageSize - 1}`,
+      Prefer: "count=exact",
+    },
+  });
+  if (!firstRes.ok && firstRes.status !== 206) throw new Error(`Supabase error ${firstRes.status}: ${await firstRes.text()}`);
+  const firstPage = await firstRes.json();
+
+  let total = firstPage.length;
+  const contentRange = firstRes.headers.get("content-range"); // "0-999/24420"
+  if (contentRange && contentRange.includes("/")) {
+    const totalStr = contentRange.split("/")[1];
+    if (totalStr !== "*") total = parseInt(totalStr, 10);
+  }
+
+  if (firstPage.length < pageSize || total <= pageSize) return firstPage;
+
+  const remainingStarts = [];
+  for (let from = pageSize; from < total; from += pageSize) remainingStarts.push(from);
+
+  const remainingPages = await Promise.all(remainingStarts.map(async (from) => {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
       headers: {
         apikey: SUPABASE_ANON_KEY,
@@ -291,12 +314,10 @@ async function sbAll(path) {
       },
     });
     if (!res.ok && res.status !== 206) throw new Error(`Supabase error ${res.status}: ${await res.text()}`);
-    const chunk = await res.json();
-    all = all.concat(chunk);
-    if (chunk.length < pageSize) break;
-    from += pageSize;
-  }
-  return all;
+    return res.json();
+  }));
+
+  return firstPage.concat(...remainingPages);
 }
 
 function uniqueSorted(arr) { return [...new Set(arr)].sort(); }
@@ -665,6 +686,7 @@ async function switchView(mode) {
 
   viewMode = mode;
   ALL_ROWS = mode === "domain" ? DOMAIN_ROWS : MAILBOX_ROWS;
+  document.getElementById("updated").textContent = `${ALL_ROWS.length.toLocaleString()} rows loaded`;
   domainBtn.classList.toggle("active", mode === "domain");
   mailboxBtn.classList.toggle("active", mode === "mailbox");
   document.getElementById("table-title").textContent = mode === "domain" ? "Domain / Week Detail" : "Mailbox / Week Detail";
