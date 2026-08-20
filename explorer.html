@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Infrastructure Health Dashboard</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#141b23; --panel-2:#1a222c; --line:#232c37;
+    --ink:#e6edf3; --ink-dim:#7d8a99;
+    --good:#2fbf71; --warn:#e8a33d; --bad:#e0483e; --accent:#5b8def;
+    --mono:"JetBrains Mono","SF Mono",Consolas,monospace;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);padding:28px 20px 60px;}
+  .wrap{max-width:1180px;margin:0 auto;}
+  header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px;}
+  h1{font-size:1.1rem;font-weight:600;margin:0;}
+  a.back{color:var(--ink-dim);font-size:.8rem;text-decoration:none;}
+  a.back:hover{color:var(--accent);}
+  .updated{font-family:var(--mono);font-size:.75rem;color:var(--ink-dim);}
+
+  .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:16px;}
+  @media(max-width:760px){.kpis{grid-template-columns:1fr;}}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;transition:background .2s,border-color .2s;}
+  .kpi.status-red{background:#3a1414;border-color:var(--bad);}
+  .kpi.status-green{background:#123422;border-color:var(--good);}
+  .kpi.status-yellow{background:#3a2e12;border-color:var(--warn);}
+  .kpi .label{font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-dim);}
+  .kpi-body{display:flex;justify-content:space-between;align-items:flex-end;margin-top:6px;flex-wrap:wrap;gap:10px;}
+  .kpi .value{font-family:var(--mono);font-size:1.9rem;font-weight:600;}
+  .compare{display:flex;gap:16px;font-size:.66rem;color:var(--ink-dim);text-align:right;line-height:1.5;}
+  .compare span{font-family:var(--mono);color:var(--ink);font-size:.85rem;display:block;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:16px;}
+  .panel h2{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-dim);margin:0 0 14px;}
+
+  .view-toggle-row{display:flex;gap:6px;margin-bottom:16px;}
+  .view-btn{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--ink-dim);
+    padding:8px 16px;border-radius:6px;font-size:.82rem;cursor:pointer;font-weight:500;
+  }
+  .view-btn.active{background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:600;}
+  .view-btn:disabled{opacity:.5;cursor:wait;}
+
+  .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;align-items:end;}
+  .field label{display:block;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim);margin-bottom:6px;}
+  .field select,.field input{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
+    color:var(--ink);padding:7px 9px;font-family:var(--sans);font-size:.85rem;
+  }
+  .field input:focus,.field select:focus{outline:none;border-color:var(--accent);}
+  .range-pair{display:flex;gap:6px;}
+
+  .domain-box{position:relative;}
+  #domain-search{width:100%;}
+  #domain-list{
+    display:none;position:absolute;z-index:5;top:100%;left:0;right:0;margin-top:4px;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:6px;
+    max-height:220px;overflow-y:auto;
+  }
+  #domain-list.open{display:block;}
+  #domain-list div{padding:7px 10px;font-size:.83rem;cursor:pointer;display:flex;justify-content:space-between;gap:8px;}
+  #domain-list div:hover{background:#232e3a;}
+  #domain-list .tag{color:var(--ink-dim);font-size:.7rem;text-transform:uppercase;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .chip{
+    background:#1c2836;border:1px solid var(--line);border-radius:20px;padding:3px 10px 3px 12px;
+    font-size:.78rem;display:flex;align-items:center;gap:6px;
+  }
+  .chip button{background:none;border:none;color:var(--ink-dim);cursor:pointer;font-size:.9rem;line-height:1;padding:0;}
+  .chip button:hover{color:var(--bad);}
+
+  .actions{display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:10px;}
+  button.btn{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--ink);
+    padding:8px 14px;border-radius:6px;font-size:.82rem;cursor:pointer;
+  }
+  button.btn:hover{border-color:var(--accent);}
+  button.btn.primary{background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:600;}
+  .result-count{font-size:.78rem;color:var(--ink-dim);font-family:var(--mono);}
+
+  #trend{width:100%;height:260px;display:block;}
+  .legend{display:flex;gap:18px;margin-top:8px;font-size:.78rem;color:var(--ink-dim);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .legend i{width:10px;height:10px;border-radius:2px;display:inline-block;}
+
+  table{width:100%;border-collapse:collapse;font-size:.85rem;}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  th{color:var(--ink-dim);font-weight:500;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;user-select:none;}
+  th:hover{color:var(--ink);}
+  th .arrow{margin-left:3px;}
+  td.num,th.num{text-align:right;font-family:var(--mono);}
+  .table-wrap{overflow-x:auto;max-height:520px;overflow-y:auto;}
+  .empty{color:var(--ink-dim);font-size:.85rem;padding:24px 0;text-align:center;}
+  .setup{background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:20px 22px;font-size:.85rem;color:var(--ink-dim);line-height:1.6;}
+  .setup code{color:var(--ink);background:#1c2530;padding:1px 6px;border-radius:4px;font-family:var(--mono);font-size:.82rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <a class="back" href="index.html">&larr; Overview</a>
+      <h1 style="margin-top:4px;">Infrastructure Health Dashboard</h1>
+    </div>
+    <div class="updated" id="updated">loading…</div>
+  </header>
+
+  <div id="setup-notice"></div>
+
+  <div class="panel" style="padding:16px 20px;">
+    <h2 style="margin-bottom:8px;">How to read this</h2>
+    <p style="font-size:.85rem;color:var(--ink-dim);line-height:1.6;margin:0;">
+      <strong style="color:var(--ink);">Bounce rate</strong>, lower is better. Above 2% on a domain usually means
+      it needs pausing, warming up again, or a sending-reputation check.
+      <strong style="color:var(--ink);">Reply rate</strong>, higher is better. Below 1% often points to targeting
+      or copy that needs a refresh. Use <strong style="color:var(--ink);">Week From / Week To</strong> to pick a
+      time window, search a <strong style="color:var(--ink);">domain or mailbox</strong> to isolate it, or set numeric ranges
+      to surface outliers (e.g. bounce % min 3 finds every domain currently in trouble). The two stat boxes below
+      always show your currently selected range on the left, with last week and the trailing 3-month average
+      alongside for quick comparison. Switch between <strong style="color:var(--ink);">Domain</strong> and
+      <strong style="color:var(--ink);">Mailbox</strong> view below to change how granular the table gets.
+    </p>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi" id="bounce-kpi">
+      <div class="label">Avg Bounce Rate, Selected Range</div>
+      <div class="kpi-body">
+        <div class="value" id="kpi-bounce">–%</div>
+        <div class="compare">
+          <div>Last week<br><span id="cmp-bounce-week">–%</span></div>
+          <div>3-mo avg<br><span id="cmp-bounce-3mo">–%</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kpi" id="reply-kpi">
+      <div class="label">Avg Reply Rate, Selected Range</div>
+      <div class="kpi-body">
+        <div class="value" id="kpi-reply">–%</div>
+        <div class="compare">
+          <div>Last week<br><span id="cmp-reply-week">–%</span></div>
+          <div>3-mo avg<br><span id="cmp-reply-3mo">–%</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Filters</h2>
+    <div class="view-toggle-row">
+      <button class="view-btn active" id="btn-domain-view" data-mode="domain">Domain View</button>
+      <button class="view-btn" id="btn-mailbox-view" data-mode="mailbox">Mailbox View</button>
+    </div>
+    <div class="filters">
+      <div class="field">
+        <label>Week From</label>
+        <select id="week-from"></select>
+      </div>
+      <div class="field">
+        <label>Week To</label>
+        <select id="week-to"></select>
+      </div>
+      <div class="field">
+        <label>Min Sent</label>
+        <input type="number" id="min-sent" placeholder="0">
+      </div>
+      <div class="field">
+        <label>Bounce Rate % (min / max)</label>
+        <div class="range-pair">
+          <input type="number" id="bounce-min" placeholder="min" step="0.1">
+          <input type="number" id="bounce-max" placeholder="max" step="0.1">
+        </div>
+      </div>
+      <div class="field">
+        <label>Reply Rate % (min / max)</label>
+        <div class="range-pair">
+          <input type="number" id="reply-min" placeholder="min" step="0.1">
+          <input type="number" id="reply-max" placeholder="max" step="0.1">
+        </div>
+      </div>
+      <div class="field domain-box">
+        <label id="search-label">Domain Search</label>
+        <input type="text" id="domain-search" placeholder="Type to find & add domains…" autocomplete="off">
+        <div id="domain-list"></div>
+      </div>
+    </div>
+    <div class="chips" id="domain-chips"></div>
+    <div class="actions">
+      <button class="btn" id="reset-btn">Reset all filters</button>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <span class="result-count" id="result-count"></span>
+        <button class="btn primary" id="export-btn">Export filtered CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Trend, Filtered Domains, By Week</h2>
+    <div style="position:relative;">
+      <svg id="trend" viewBox="0 0 1120 260" preserveAspectRatio="none"></svg>
+      <div id="tooltip" style="display:none;position:absolute;background:#1c2530;border:1px solid var(--line);
+        border-radius:6px;padding:8px 11px;font-size:.78rem;font-family:var(--mono);pointer-events:none;
+        white-space:nowrap;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,.4);"></div>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--bad);"></i>Bounce rate</span>
+      <span><i style="background:var(--good);"></i>Reply rate</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2 id="table-title">Domain / Week Detail</h2>
+    <p style="font-size:.78rem;color:var(--ink-dim);margin:-8px 0 12px;">
+      Click any column header to sort, click again to reverse order.
+    </p>
+    <div class="table-wrap">
+      <table id="data-table">
+        <thead id="table-head"></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="empty" id="table-empty" style="display:none;">No rows match the current filters.</div>
+  </div>
+</div>
+
+<script>
+// ---- Fill these in once ----
+const SUPABASE_URL = "https://tuccoyvmlfhqpapbbjta.supabase.co";   // e.g. https://tuccoyvmlfhqpapbbjta.supabase.co
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1Y2NveXZtbGZocXBhcGJianRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0MDI1OTcsImV4cCI6MjEwMTk3ODU5N30.vEE3ec977LVhOrD8559afwGtyU_QP1Hm91K5vbcQo_g"; // Project Settings -> API -> anon/public key (NOT service_role)
+// -----------------------------
+
+const BOUNCE_THRESHOLD = 2.0;
+const REPLY_THRESHOLD = 1.0;
+
+let viewMode = "domain";
+let DOMAIN_ROWS = [];
+let MAILBOX_ROWS = null; // lazy-loaded on first toggle to Mailbox View
+let ALL_ROWS = [];
+let selectedChips = new Set(); // entries like "domain:foo.com" or "email:jim@foo.com"
+let sortKey = "week_start";
+let sortDir = -1; // -1 desc, 1 asc
+let lastWeekBounceNum = null;
+let lastWeekReplyNum = null;
+
+const COLUMNS = {
+  domain: [
+    { key: "week_start", label: "Week" },
+    { key: "domain", label: "Domain" },
+    { key: "sent", label: "Sent", num: true },
+    { key: "bounced", label: "Bounced", num: true },
+    { key: "bounce_rate", label: "Bounce %", num: true, rule: "bounce" },
+    { key: "replied", label: "Replied", num: true },
+    { key: "reply_rate", label: "Reply %", num: true, rule: "reply" },
+  ],
+  mailbox: [
+    { key: "week_start", label: "Week" },
+    { key: "email", label: "Mailbox" },
+    { key: "domain", label: "Domain" },
+    { key: "sent", label: "Sent", num: true },
+    { key: "bounced", label: "Bounced", num: true },
+    { key: "bounce_rate", label: "Bounce %", num: true, rule: "bounce" },
+    { key: "replied", label: "Replied", num: true },
+    { key: "reply_rate", label: "Reply %", num: true, rule: "reply" },
+    { key: "daily_limit", label: "Daily Limit", num: true },
+  ],
+};
+
+async function sb(path) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+  });
+  if (!res.ok) throw new Error(`Supabase error ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+// Supabase caps a single request at 1000 rows by default, page through
+// with the Range header until a page comes back shorter than the page size.
+async function sbAll(path) {
+  const pageSize = 1000;
+  let from = 0;
+  let all = [];
+  while (true) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        Range: `${from}-${from + pageSize - 1}`,
+      },
+    });
+    if (!res.ok && res.status !== 206) throw new Error(`Supabase error ${res.status}: ${await res.text()}`);
+    const chunk = await res.json();
+    all = all.concat(chunk);
+    if (chunk.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
+function uniqueSorted(arr) { return [...new Set(arr)].sort(); }
+
+function populateWeekSelectors(weeks) {
+  const fromSel = document.getElementById("week-from");
+  const toSel = document.getElementById("week-to");
+  const prevFrom = fromSel.value, prevTo = toSel.value;
+  [fromSel, toSel].forEach(sel => sel.innerHTML = "");
+  weeks.forEach(w => {
+    fromSel.appendChild(new Option(w, w));
+    toSel.appendChild(new Option(w, w));
+  });
+  fromSel.value = weeks.includes(prevFrom) ? prevFrom : weeks[0];
+  toSel.value = weeks.includes(prevTo) ? prevTo : weeks[weeks.length - 1];
+}
+
+function renderChips() {
+  const box = document.getElementById("domain-chips");
+  box.innerHTML = "";
+  selectedChips.forEach(chip => {
+    const [type, value] = chip.split(":");
+    const div = document.createElement("div");
+    div.className = "chip";
+    div.innerHTML = `${value}${type === "email" ? " <span style='color:var(--ink-dim);font-size:.7rem;'>(mailbox)</span>" : ""} <button data-chip="${chip}">&times;</button>`;
+    div.querySelector("button").onclick = () => { selectedChips.delete(chip); renderChips(); applyFilters(); };
+    box.appendChild(div);
+  });
+}
+
+function setupDomainSearch() {
+  const input = document.getElementById("domain-search");
+  const list = document.getElementById("domain-list");
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    list.innerHTML = "";
+    if (!q) { list.classList.remove("open"); return; }
+
+    const domains = uniqueSorted(ALL_ROWS.map(r => r.domain)).filter(d => d.includes(q));
+    const emails = viewMode === "mailbox" ? uniqueSorted(ALL_ROWS.map(r => r.email)).filter(e => e.includes(q)) : [];
+
+    const matches = [
+      ...domains.filter(d => !selectedChips.has(`domain:${d}`)).map(d => ({ type: "domain", value: d })),
+      ...emails.filter(e => !selectedChips.has(`email:${e}`)).map(e => ({ type: "email", value: e })),
+    ].slice(0, 15);
+
+    matches.forEach(m => {
+      const item = document.createElement("div");
+      item.innerHTML = `<span>${m.value}</span><span class="tag">${m.type}</span>`;
+      item.onclick = () => {
+        selectedChips.add(`${m.type}:${m.value}`);
+        input.value = "";
+        list.classList.remove("open");
+        renderChips();
+        applyFilters();
+      };
+      list.appendChild(item);
+    });
+    list.classList.toggle("open", matches.length > 0);
+  });
+  document.addEventListener("click", e => {
+    if (!e.target.closest(".domain-box")) list.classList.remove("open");
+  });
+}
+
+function getFiltered() {
+  const weekFrom = document.getElementById("week-from").value;
+  const weekTo = document.getElementById("week-to").value;
+  const minSent = parseFloat(document.getElementById("min-sent").value) || 0;
+  const bounceMin = parseFloat(document.getElementById("bounce-min").value);
+  const bounceMax = parseFloat(document.getElementById("bounce-max").value);
+  const replyMin = parseFloat(document.getElementById("reply-min").value);
+  const replyMax = parseFloat(document.getElementById("reply-max").value);
+
+  const domainChips = [...selectedChips].filter(c => c.startsWith("domain:")).map(c => c.slice(7));
+  const emailChips = [...selectedChips].filter(c => c.startsWith("email:")).map(c => c.slice(6));
+
+  return ALL_ROWS.filter(r => {
+    if (r.week_start < weekFrom || r.week_start > weekTo) return false;
+    if (r.sent < minSent) return false;
+    if (!isNaN(bounceMin) && r.bounce_rate < bounceMin) return false;
+    if (!isNaN(bounceMax) && r.bounce_rate > bounceMax) return false;
+    if (!isNaN(replyMin) && r.reply_rate < replyMin) return false;
+    if (!isNaN(replyMax) && r.reply_rate > replyMax) return false;
+    if (selectedChips.size > 0) {
+      const domainMatch = domainChips.includes(r.domain);
+      const emailMatch = viewMode === "mailbox" && emailChips.includes(r.email);
+      if (!domainMatch && !emailMatch) return false;
+    }
+    return true;
+  });
+}
+
+function classifyBounce(rate, lastWeekRate) {
+  const worseThanLastWeek = lastWeekRate != null && rate > lastWeekRate;
+  if (rate > BOUNCE_THRESHOLD || worseThanLastWeek) return "red";
+  return "green";
+}
+
+function classifyReply(rate, lastWeekRate) {
+  const worseThanLastWeek = lastWeekRate != null && rate < lastWeekRate;
+  const betterThanLastWeek = lastWeekRate != null && rate > lastWeekRate;
+  if (rate < REPLY_THRESHOLD && worseThanLastWeek) return "red";
+  if (rate >= REPLY_THRESHOLD && betterThanLastWeek) return "green";
+  return "yellow";
+}
+
+function drawTrend(rows) {
+  const svg = document.getElementById("trend");
+  const tooltip = document.getElementById("tooltip");
+  svg.innerHTML = "";
+  const byWeek = {};
+  rows.forEach(r => {
+    byWeek[r.week_start] ??= { week_start: r.week_start, sent: 0, bounced: 0, replied: 0 };
+    byWeek[r.week_start].sent += r.sent;
+    byWeek[r.week_start].bounced += r.bounced;
+    byWeek[r.week_start].replied += r.replied;
+  });
+  const weeks = Object.values(byWeek).sort((a, b) => a.week_start.localeCompare(b.week_start)).map(w => ({
+    week_start: w.week_start,
+    bounce_rate: w.sent ? +(w.bounced / w.sent * 100).toFixed(2) : 0,
+    reply_rate: w.sent ? +(w.replied / w.sent * 100).toFixed(2) : 0,
+  }));
+  if (!weeks.length) {
+    svg.innerHTML = `<text x="560" y="130" fill="var(--ink-dim)" font-size="14" text-anchor="middle">No data for current filters</text>`;
+    tooltip.style.display = "none";
+    return;
+  }
+
+  const W = 1120, H = 260, padL = 46, padR = 20, padT = 14, padB = 34;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const maxVal = Math.max(2, ...weeks.map(r => Math.max(r.bounce_rate, r.reply_rate))) * 1.2;
+
+  const x = i => weeks.length === 1 ? padL + plotW / 2 : padL + (i / (weeks.length - 1)) * plotW;
+  const y = v => padT + plotH - (v / maxVal) * plotH;
+
+  const steps = 5;
+  for (let s = 0; s <= steps; s++) {
+    const val = (maxVal / steps) * s;
+    const gy = y(val);
+    const gline = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    gline.setAttribute("x1", padL); gline.setAttribute("x2", W - padR);
+    gline.setAttribute("y1", gy); gline.setAttribute("y2", gy);
+    gline.setAttribute("stroke", "#1b232d"); gline.setAttribute("stroke-width", "1");
+    svg.appendChild(gline);
+    const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    label.setAttribute("x", padL - 8); label.setAttribute("y", gy + 4);
+    label.setAttribute("fill", "var(--ink-dim)"); label.setAttribute("font-size", "10");
+    label.setAttribute("text-anchor", "end");
+    label.textContent = val.toFixed(1) + "%";
+    svg.appendChild(label);
+  }
+
+  const axis = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  axis.setAttribute("x1", padL); axis.setAttribute("x2", W - padR);
+  axis.setAttribute("y1", padT + plotH); axis.setAttribute("y2", padT + plotH);
+  axis.setAttribute("stroke", "#232c37");
+  svg.appendChild(axis);
+
+  const labelEvery = weeks.length <= 10 ? 1 : Math.ceil(weeks.length / 10);
+  weeks.forEach((w, i) => {
+    if (i % labelEvery !== 0 && i !== weeks.length - 1) return;
+    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    t.setAttribute("x", x(i)); t.setAttribute("y", H - 10);
+    t.setAttribute("fill", "var(--ink-dim)"); t.setAttribute("font-size", "10");
+    t.setAttribute("text-anchor", "middle");
+    t.textContent = w.week_start.slice(5);
+    svg.appendChild(t);
+  });
+
+  const line = (key, color) => {
+    if (weeks.length > 1) {
+      const pts = weeks.map((r, i) => `${x(i)},${y(r[key])}`).join(" ");
+      const p = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      p.setAttribute("points", pts); p.setAttribute("fill", "none");
+      p.setAttribute("stroke", color); p.setAttribute("stroke-width", "2");
+      svg.appendChild(p);
+    }
+  };
+  line("bounce_rate", "var(--bad)");
+  line("reply_rate", "var(--good)");
+
+  weeks.forEach((w, i) => {
+    [["bounce_rate", "var(--bad)"], ["reply_rate", "var(--good)"]].forEach(([key, color]) => {
+      const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      c.setAttribute("cx", x(i)); c.setAttribute("cy", y(w[key])); c.setAttribute("r", "3.5");
+      c.setAttribute("fill", color);
+      svg.appendChild(c);
+    });
+    const hit = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    const hitW = weeks.length === 1 ? plotW : plotW / weeks.length;
+    hit.setAttribute("x", x(i) - hitW / 2); hit.setAttribute("y", padT);
+    hit.setAttribute("width", hitW); hit.setAttribute("height", plotH);
+    hit.setAttribute("fill", "transparent");
+    hit.style.cursor = "pointer";
+    hit.addEventListener("mousemove", (e) => {
+      const rect = svg.getBoundingClientRect();
+      tooltip.style.display = "block";
+      tooltip.style.left = (e.clientX - rect.left + 12) + "px";
+      tooltip.style.top = (e.clientY - rect.top - 10) + "px";
+      tooltip.innerHTML = `<div style="color:var(--ink-dim);margin-bottom:4px;">${w.week_start}</div>
+        <div style="color:var(--bad);">Bounce: ${w.bounce_rate}%</div>
+        <div style="color:var(--good);">Reply: ${w.reply_rate}%</div>`;
+    });
+    hit.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+    svg.appendChild(hit);
+  });
+}
+
+function renderHead() {
+  const thead = document.getElementById("table-head");
+  const tr = document.createElement("tr");
+  COLUMNS[viewMode].forEach(col => {
+    const th = document.createElement("th");
+    th.dataset.key = col.key;
+    if (col.num) th.classList.add("num");
+    th.innerHTML = `${col.label} <span class="arrow"></span>`;
+    tr.appendChild(th);
+  });
+  thead.innerHTML = "";
+  thead.appendChild(tr);
+
+  if (!COLUMNS[viewMode].some(c => c.key === sortKey)) {
+    sortKey = "week_start";
+    sortDir = -1;
+  }
+  updateSortArrows();
+}
+
+function updateSortArrows() {
+  document.querySelectorAll("#data-table th").forEach(th => {
+    const arrow = th.querySelector(".arrow");
+    if (th.dataset.key === sortKey) {
+      arrow.textContent = sortDir === 1 ? "↑" : "↓";
+      arrow.style.opacity = "1";
+      arrow.style.color = "var(--accent)";
+    } else {
+      arrow.textContent = "↕";
+      arrow.style.opacity = ".35";
+      arrow.style.color = "";
+    }
+  });
+}
+
+function renderTable(rows) {
+  const sorted = [...rows].sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (av < bv) return -1 * sortDir;
+    if (av > bv) return 1 * sortDir;
+    return 0;
+  });
+  const tbody = document.querySelector("#data-table tbody");
+  tbody.innerHTML = "";
+  document.getElementById("table-empty").style.display = sorted.length ? "none" : "block";
+
+  sorted.slice(0, 500).forEach(r => {
+    const tr = document.createElement("tr");
+    COLUMNS[viewMode].forEach(col => {
+      const td = document.createElement("td");
+      if (col.num) td.classList.add("num");
+      let val = r[col.key];
+      if (col.key === "daily_limit") {
+        td.textContent = (val == null) ? "N/A" : val.toLocaleString();
+      } else if (col.rule === "bounce") {
+        td.textContent = val + "%";
+        td.style.color = val > BOUNCE_THRESHOLD ? "var(--bad)" : "var(--ink)";
+      } else if (col.rule === "reply") {
+        td.textContent = val + "%";
+        td.style.color = val < REPLY_THRESHOLD ? "var(--warn)" : "var(--good)";
+      } else if (col.num) {
+        td.textContent = (val || 0).toLocaleString();
+      } else {
+        td.textContent = val;
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  updateSortArrows();
+}
+
+function applyFilters() {
+  const filtered = getFiltered();
+  document.getElementById("result-count").textContent = `${filtered.length.toLocaleString()} rows`;
+  const totalSent = filtered.reduce((s, r) => s + r.sent, 0);
+  const totalBounced = filtered.reduce((s, r) => s + r.bounced, 0);
+  const totalReplied = filtered.reduce((s, r) => s + r.replied, 0);
+  const bounceRate = totalSent ? +(totalBounced / totalSent * 100).toFixed(2) : 0;
+  const replyRate = totalSent ? +(totalReplied / totalSent * 100).toFixed(2) : 0;
+  document.getElementById("kpi-bounce").textContent = bounceRate.toFixed(2) + "%";
+  document.getElementById("kpi-reply").textContent = replyRate.toFixed(2) + "%";
+
+  const bounceBox = document.getElementById("bounce-kpi");
+  const replyBox = document.getElementById("reply-kpi");
+  bounceBox.classList.remove("status-red", "status-green", "status-yellow");
+  replyBox.classList.remove("status-red", "status-green", "status-yellow");
+  bounceBox.classList.add("status-" + classifyBounce(bounceRate, lastWeekBounceNum));
+  replyBox.classList.add("status-" + classifyReply(replyRate, lastWeekReplyNum));
+
+  drawTrend(filtered);
+  renderTable(filtered);
+  window._filtered = filtered;
+}
+
+function exportCsv() {
+  const rows = window._filtered || [];
+  if (!rows.length) return;
+  const headers = COLUMNS[viewMode].map(c => c.key).concat(["week_end"]);
+  const csv = [headers.join(",")].concat(
+    rows.map(r => headers.map(h => r[h] ?? "").join(","))
+  ).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `filtered_${viewMode}_email_health.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function computeBenchmarks() {
+  const weeks = uniqueSorted(DOMAIN_ROWS.map(r => r.week_start));
+  if (!weeks.length) return;
+  const companyRate = (rows) => {
+    const sent = rows.reduce((s, r) => s + r.sent, 0);
+    const bounced = rows.reduce((s, r) => s + r.bounced, 0);
+    const replied = rows.reduce((s, r) => s + r.replied, 0);
+    return {
+      bounce: sent ? (bounced / sent * 100).toFixed(2) : "0.00",
+      reply: sent ? (replied / sent * 100).toFixed(2) : "0.00",
+    };
+  };
+  const lastWeek = weeks[weeks.length - 1];
+  const last3moWeeks = weeks.slice(-12);
+  const lastWeekRate = companyRate(DOMAIN_ROWS.filter(r => r.week_start === lastWeek));
+  const last3moRate = companyRate(DOMAIN_ROWS.filter(r => last3moWeeks.includes(r.week_start)));
+  lastWeekBounceNum = parseFloat(lastWeekRate.bounce);
+  lastWeekReplyNum = parseFloat(lastWeekRate.reply);
+  document.getElementById("cmp-bounce-week").textContent = lastWeekRate.bounce + "%";
+  document.getElementById("cmp-bounce-3mo").textContent = last3moRate.bounce + "%";
+  document.getElementById("cmp-reply-week").textContent = lastWeekRate.reply + "%";
+  document.getElementById("cmp-reply-3mo").textContent = last3moRate.reply + "%";
+}
+
+async function switchView(mode) {
+  if (mode === viewMode) return;
+  const domainBtn = document.getElementById("btn-domain-view");
+  const mailboxBtn = document.getElementById("btn-mailbox-view");
+
+  if (mode === "mailbox" && MAILBOX_ROWS === null) {
+    mailboxBtn.disabled = true;
+    mailboxBtn.textContent = "Loading…";
+    try {
+      MAILBOX_ROWS = await sbAll("mailbox_weekly_stats?select=week_start,week_end,mailbox_id,email,domain,sent,bounced,replied,bounce_rate,reply_rate,daily_limit&order=week_start.asc");
+    } catch (e) {
+      console.error(e);
+      mailboxBtn.disabled = false;
+      mailboxBtn.textContent = "Mailbox View";
+      alert("Could not load mailbox-level data. Check that mailbox_weekly_stats exists and RLS allows anon SELECT.");
+      return;
+    }
+    mailboxBtn.disabled = false;
+    mailboxBtn.textContent = "Mailbox View";
+  }
+
+  viewMode = mode;
+  ALL_ROWS = mode === "domain" ? DOMAIN_ROWS : MAILBOX_ROWS;
+  domainBtn.classList.toggle("active", mode === "domain");
+  mailboxBtn.classList.toggle("active", mode === "mailbox");
+  document.getElementById("table-title").textContent = mode === "domain" ? "Domain / Week Detail" : "Mailbox / Week Detail";
+  document.getElementById("search-label").textContent = mode === "domain" ? "Domain Search" : "Domain or Mailbox Search";
+  document.getElementById("domain-search").placeholder = mode === "domain" ? "Type to find & add domains…" : "Type to find & add domains or mailboxes…";
+
+  const weeks = uniqueSorted(ALL_ROWS.map(r => r.week_start));
+  populateWeekSelectors(weeks);
+  renderHead();
+  applyFilters();
+}
+
+async function main() {
+  if (SUPABASE_URL.startsWith("YOUR_") || SUPABASE_ANON_KEY.startsWith("YOUR_")) {
+    document.getElementById("setup-notice").innerHTML = `
+      <div class="setup">
+        Not connected yet. Set <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code>
+        at the top of the script (Project Settings → API → anon/public key). Also ensure a
+        read-only RLS policy allows <code>SELECT</code> on <code>domain_weekly_stats</code> and
+        <code>mailbox_weekly_stats</code> for the anon role.
+      </div>`;
+    document.getElementById("updated").textContent = "not connected";
+    return;
+  }
+  try {
+    DOMAIN_ROWS = await sbAll("domain_weekly_stats?select=week_start,week_end,domain,sent,bounced,replied,bounce_rate,reply_rate&order=week_start.asc");
+    ALL_ROWS = DOMAIN_ROWS;
+    if (!ALL_ROWS.length) { document.getElementById("updated").textContent = "no data yet"; return; }
+
+    document.getElementById("updated").textContent = `${ALL_ROWS.length.toLocaleString()} rows loaded`;
+    const weeks = uniqueSorted(ALL_ROWS.map(r => r.week_start));
+    populateWeekSelectors(weeks);
+    setupDomainSearch();
+    computeBenchmarks();
+    renderHead();
+
+    ["week-from", "week-to", "min-sent", "bounce-min", "bounce-max", "reply-min", "reply-max"]
+      .forEach(id => document.getElementById(id).addEventListener("input", applyFilters));
+
+    document.getElementById("reset-btn").onclick = () => {
+      const w = uniqueSorted(ALL_ROWS.map(r => r.week_start));
+      populateWeekSelectors(w);
+      document.getElementById("week-from").value = w[0];
+      document.getElementById("week-to").value = w[w.length - 1];
+      ["min-sent", "bounce-min", "bounce-max", "reply-min", "reply-max"].forEach(id => document.getElementById(id).value = "");
+      selectedChips.clear();
+      renderChips();
+      applyFilters();
+    };
+    document.getElementById("export-btn").onclick = exportCsv;
+
+    document.getElementById("table-head").addEventListener("click", (e) => {
+      const th = e.target.closest("th");
+      if (!th) return;
+      const key = th.dataset.key;
+      sortDir = (sortKey === key) ? -sortDir : -1;
+      sortKey = key;
+      applyFilters();
+    });
+
+    document.getElementById("btn-domain-view").addEventListener("click", () => switchView("domain"));
+    document.getElementById("btn-mailbox-view").addEventListener("click", () => switchView("mailbox"));
+
+    applyFilters();
+  } catch (e) {
+    document.getElementById("updated").textContent = "error loading data";
+    console.error(e);
+  }
+}
+
+main();
+</script>
+</body>
+</html>
