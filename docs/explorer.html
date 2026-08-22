@@ -119,8 +119,8 @@
       or copy that needs a refresh. Use <strong style="color:var(--ink);">Week From / Week To</strong> to pick a
       time window, search a <strong style="color:var(--ink);">domain or mailbox</strong> to isolate it, or set numeric ranges
       to surface outliers (e.g. bounce % min 3 finds every domain currently in trouble). The two stat boxes below
-      always show your currently selected range on the left, with last week and the trailing 3-month average
-      alongside for quick comparison. Switch between <strong style="color:var(--ink);">Domain</strong> and
+      always show your currently selected range on the left, with the latest available week and the trailing
+      3-month average (both fixed reference points, not tied to your filter selection) alongside for quick comparison. Switch between <strong style="color:var(--ink);">Domain</strong> and
       <strong style="color:var(--ink);">Mailbox</strong> view below to change how granular the table gets.
     </p>
   </div>
@@ -131,7 +131,7 @@
       <div class="kpi-body">
         <div class="value" id="kpi-bounce">–%</div>
         <div class="compare">
-          <div>Last week<br><span id="cmp-bounce-week">–%</span></div>
+          <div>Latest week<br><span id="cmp-bounce-week">–%</span></div>
           <div>3-mo avg<br><span id="cmp-bounce-3mo">–%</span></div>
         </div>
       </div>
@@ -141,7 +141,7 @@
       <div class="kpi-body">
         <div class="value" id="kpi-reply">–%</div>
         <div class="compare">
-          <div>Last week<br><span id="cmp-reply-week">–%</span></div>
+          <div>Latest week<br><span id="cmp-reply-week">–%</span></div>
           <div>3-mo avg<br><span id="cmp-reply-3mo">–%</span></div>
         </div>
       </div>
@@ -279,7 +279,7 @@ async function sb(path) {
 // Supabase caps a single request at 1000 rows by default. Fetch the first page
 // with an exact count, then fire every remaining page concurrently (instead of
 // one-at-a-time) since wall-clock time here is dominated by network latency,
-// not server work — parallel requests finish in roughly one round-trip.
+// not server work, parallel requests finish in roughly one round-trip.
 async function sbAll(path) {
   const pageSize = 1000;
   const firstRes = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
