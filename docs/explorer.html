@@ -119,8 +119,8 @@
       or copy that needs a refresh. Use <strong style="color:var(--ink);">Week From / Week To</strong> to pick a
       time window, search a <strong style="color:var(--ink);">domain or mailbox</strong> to isolate it, or set numeric ranges
       to surface outliers (e.g. bounce % min 3 finds every domain currently in trouble). The two stat boxes below
-      always show your currently selected range on the left, with the latest available week and the trailing
-      3-month average (both fixed reference points, not tied to your filter selection) alongside for quick comparison. Switch between <strong style="color:var(--ink);">Domain</strong> and
+      always show your currently selected range on the left, with the latest available week and the week
+      before it (both fixed reference points, not tied to your filter selection) alongside for quick comparison. Switch between <strong style="color:var(--ink);">Domain</strong> and
       <strong style="color:var(--ink);">Mailbox</strong> view below to change how granular the table gets.
     </p>
   </div>
@@ -132,7 +132,7 @@
         <div class="value" id="kpi-bounce">–%</div>
         <div class="compare">
           <div>Latest week<br><span id="cmp-bounce-week">–%</span></div>
-          <div>3-mo avg<br><span id="cmp-bounce-3mo">–%</span></div>
+          <div>Previous week<br><span id="cmp-bounce-prev">–%</span></div>
         </div>
       </div>
     </div>
@@ -142,7 +142,7 @@
         <div class="value" id="kpi-reply">–%</div>
         <div class="compare">
           <div>Latest week<br><span id="cmp-reply-week">–%</span></div>
-          <div>3-mo avg<br><span id="cmp-reply-3mo">–%</span></div>
+          <div>Previous week<br><span id="cmp-reply-prev">–%</span></div>
         </div>
       </div>
     </div>
@@ -652,15 +652,17 @@ function computeBenchmarks() {
     };
   };
   const lastWeek = weeks[weeks.length - 1];
-  const last3moWeeks = weeks.slice(-12);
+  const previousWeek = weeks.length >= 2 ? weeks[weeks.length - 2] : null;
   const lastWeekRate = companyRate(DOMAIN_ROWS.filter(r => r.week_start === lastWeek));
-  const last3moRate = companyRate(DOMAIN_ROWS.filter(r => last3moWeeks.includes(r.week_start)));
+  const previousWeekRate = previousWeek
+    ? companyRate(DOMAIN_ROWS.filter(r => r.week_start === previousWeek))
+    : { bounce: "N/A", reply: "N/A" };
   lastWeekBounceNum = parseFloat(lastWeekRate.bounce);
   lastWeekReplyNum = parseFloat(lastWeekRate.reply);
   document.getElementById("cmp-bounce-week").textContent = lastWeekRate.bounce + "%";
-  document.getElementById("cmp-bounce-3mo").textContent = last3moRate.bounce + "%";
+  document.getElementById("cmp-bounce-prev").textContent = previousWeekRate.bounce === "N/A" ? "N/A" : previousWeekRate.bounce + "%";
   document.getElementById("cmp-reply-week").textContent = lastWeekRate.reply + "%";
-  document.getElementById("cmp-reply-3mo").textContent = last3moRate.reply + "%";
+  document.getElementById("cmp-reply-prev").textContent = previousWeekRate.reply === "N/A" ? "N/A" : previousWeekRate.reply + "%";
 }
 
 async function switchView(mode) {
