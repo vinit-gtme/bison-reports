@@ -25,7 +25,12 @@ jobs:
               should_run = True
           else:
               now = datetime.now(ZoneInfo("America/New_York"))
-              should_run = (now.weekday() == 4 and now.hour == 20)  # Friday == 4, 20 == 8PM
+              # Allow up to 20 minutes of scheduling delay around 8:00 PM,
+              # narrower than the 60-minute gap between the two DST cron
+              # entries above, so only the correct-season trigger ever passes.
+              target_minutes = 20 * 60
+              current_minutes = now.hour * 60 + now.minute
+              should_run = (now.weekday() == 4 and abs(current_minutes - target_minutes) <= 20)
 
           print(f"event: {event_name}, should_run: {should_run}")
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
@@ -45,6 +50,15 @@ jobs:
       - name: Install dependencies
         if: steps.guard.outputs.run == 'true'
         run: pip install -r requirements.txt
+
+      - name: Debug — check Supabase secrets are visible
+        if: steps.guard.outputs.run == 'true'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ]; then echo "SUPABASE_URL: EMPTY/UNSET"; else echo "SUPABASE_URL: set, length ${#SUPABASE_URL}"; fi
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then echo "SUPABASE_SERVICE_ROLE_KEY: EMPTY/UNSET"; else echo "SUPABASE_SERVICE_ROLE_KEY: set, length ${#SUPABASE_SERVICE_ROLE_KEY}"; fi
 
       - name: Run reply rate report
         if: steps.guard.outputs.run == 'true'
