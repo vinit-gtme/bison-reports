@@ -80,6 +80,9 @@
   button.btn:hover{border-color:var(--accent);}
   button.btn.primary{background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:600;}
   .result-count{font-size:.78rem;color:var(--ink-dim);font-family:var(--mono);}
+  .inline-check{display:inline-flex;align-items:center;gap:7px;font-size:.8rem;color:var(--ink-dim);cursor:pointer;user-select:none;}
+  .inline-check:hover{color:var(--ink);}
+  .inline-check input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;margin:0;}
 
   #trend{width:100%;height:260px;display:block;}
   .legend{display:flex;gap:18px;margin-top:8px;font-size:.78rem;color:var(--ink-dim);}
@@ -122,6 +125,8 @@
       always show your currently selected range on the left, with the latest available week and the week
       before it (both fixed reference points, not tied to your filter selection) alongside for quick comparison. Switch between <strong style="color:var(--ink);">Domain</strong> and
       <strong style="color:var(--ink);">Mailbox</strong> view below to change how granular the table gets.
+      Rows where nothing was sent (for example disconnected domains) are hidden by default and never affect the
+      averages. Tick <strong style="color:var(--ink);">Show inactive rows</strong> to include them.
     </p>
   </div>
 
@@ -189,7 +194,12 @@
     </div>
     <div class="chips" id="domain-chips"></div>
     <div class="actions">
-      <button class="btn" id="reset-btn">Reset all filters</button>
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+        <button class="btn" id="reset-btn">Reset all filters</button>
+        <label class="inline-check" title="Rows where nothing was sent are hidden by default. They never affect the averages.">
+          <input type="checkbox" id="show-inactive"> Show inactive rows (0 sent)
+        </label>
+      </div>
       <div style="display:flex;gap:10px;align-items:center;">
         <span class="result-count" id="result-count"></span>
         <button class="btn primary" id="export-btn">Export filtered CSV</button>
@@ -228,8 +238,8 @@
 
 <script>
 // ---- Fill these in once ----
-const SUPABASE_URL = "https://tuccoyvmlfhqpapbbjta.supabase.co";   // e.g. https://tuccoyvmlfhqpapbbjta.supabase.co
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1Y2NveXZtbGZocXBhcGJianRhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0MDI1OTcsImV4cCI6MjEwMTk3ODU5N30.vEE3ec977LVhOrD8559afwGtyU_QP1Hm91K5vbcQo_g"; // Project Settings -> API -> anon/public key (NOT service_role)
+const SUPABASE_URL = "https://tuccoyvmlfhqpapbbjta.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_OoWVr9d-APksjIKx_u-44g_5bWLT1dO"; // anon/public key only, never service_role
 // -----------------------------
 
 const BOUNCE_THRESHOLD = 2.0;
@@ -356,8 +366,9 @@ function setupDomainSearch() {
     list.innerHTML = "";
     if (!q) { list.classList.remove("open"); return; }
 
-    const domains = uniqueSorted(ALL_ROWS.map(r => r.domain)).filter(d => d.includes(q));
-    const emails = viewMode === "mailbox" ? uniqueSorted(ALL_ROWS.map(r => r.email)).filter(e => e.includes(q)) : [];
+    const pool = showInactiveRows() ? ALL_ROWS : ALL_ROWS.filter(r => r.sent > 0);
+    const domains = uniqueSorted(pool.map(r => r.domain)).filter(d => d.includes(q));
+    const emails = viewMode === "mailbox" ? uniqueSorted(pool.map(r => r.email)).filter(e => e.includes(q)) : [];
 
     const matches = [
       ...domains.filter(d => !selectedChips.has(`domain:${d}`)).map(d => ({ type: "domain", value: d })),
@@ -383,7 +394,15 @@ function setupDomainSearch() {
   });
 }
 
-function getFiltered() {
+function showInactiveRows() {
+  return document.getElementById("show-inactive").checked;
+}
+
+// Rows where nothing was sent (e.g. disconnected domains) are hidden by default.
+// They contribute nothing to total sent/bounced/replied, so hiding them never
+// changes an average or a trend point, it only removes clutter. History from the
+// weeks a domain was actually sending is untouched.
+function getFiltered(includeInactive = showInactiveRows()) {
   const weekFrom = document.getElementById("week-from").value;
   const weekTo = document.getElementById("week-to").value;
   const minSent = parseFloat(document.getElementById("min-sent").value) || 0;
@@ -397,6 +416,7 @@ function getFiltered() {
 
   return ALL_ROWS.filter(r => {
     if (r.week_start < weekFrom || r.week_start > weekTo) return false;
+    if (!includeInactive && !r.sent) return false;
     if (r.sent < minSent) return false;
     if (!isNaN(bounceMin) && r.bounce_rate < bounceMin) return false;
     if (!isNaN(bounceMax) && r.bounce_rate > bounceMax) return false;
@@ -603,7 +623,10 @@ function renderTable(rows) {
 
 function applyFilters() {
   const filtered = getFiltered();
-  document.getElementById("result-count").textContent = `${filtered.length.toLocaleString()} rows`;
+  const hiddenCount = showInactiveRows() ? 0 : getFiltered(true).length - filtered.length;
+  document.getElementById("result-count").textContent =
+    `${filtered.length.toLocaleString()} rows` +
+    (hiddenCount > 0 ? ` (${hiddenCount.toLocaleString()} zero-send hidden)` : "");
   const totalSent = filtered.reduce((s, r) => s + r.sent, 0);
   const totalBounced = filtered.reduce((s, r) => s + r.bounced, 0);
   const totalReplied = filtered.reduce((s, r) => s + r.replied, 0);
@@ -727,12 +750,14 @@ async function main() {
 
     ["week-from", "week-to", "min-sent", "bounce-min", "bounce-max", "reply-min", "reply-max"]
       .forEach(id => document.getElementById(id).addEventListener("input", applyFilters));
+    document.getElementById("show-inactive").addEventListener("change", applyFilters);
 
     document.getElementById("reset-btn").onclick = () => {
       const w = uniqueSorted(ALL_ROWS.map(r => r.week_start));
       populateWeekSelectors(w);
       document.getElementById("week-from").value = w[0];
       document.getElementById("week-to").value = w[w.length - 1];
+      document.getElementById("show-inactive").checked = false;
       ["min-sent", "bounce-min", "bounce-max", "reply-min", "reply-max"].forEach(id => document.getElementById(id).value = "");
       selectedChips.clear();
       renderChips();
