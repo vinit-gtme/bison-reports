@@ -84,21 +84,50 @@
   .inline-check:hover{color:var(--ink);}
   .inline-check input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;margin:0;}
   .hint{font-size:.78rem;color:var(--ink-dim);line-height:1.6;margin:0 0 12px;}
-  .status-chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px;}
-  .schip{background:var(--panel-2);border:1px solid var(--line);color:var(--ink-dim);padding:5px 12px;border-radius:20px;font-size:.78rem;cursor:pointer;font-family:var(--sans);}
-  .schip:hover{border-color:var(--accent);}
-  .schip.on{border-color:var(--accent);color:var(--ink);}
-  .schip b{font-family:var(--mono);font-weight:600;margin-left:6px;color:var(--ink);}
-  #status-table th{position:sticky;top:0;background:var(--panel);z-index:1;line-height:1.35;vertical-align:bottom;}
-  #status-table td{vertical-align:top;}
+  .table-wrap{scrollbar-width:thin;scrollbar-color:#2c3745 transparent;}
+  .table-wrap::-webkit-scrollbar{width:10px;height:10px;}
+  .table-wrap::-webkit-scrollbar-thumb{background:#2c3745;border-radius:6px;border:2px solid var(--panel);}
+  .table-wrap::-webkit-scrollbar-track{background:transparent;}
+  .status-head-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+  .week-pill{font-family:var(--mono);font-size:.74rem;color:var(--ink-dim);border:1px solid var(--line);border-radius:20px;padding:3px 12px;}
+  .status-chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px;}
+  .schip{display:inline-flex;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--line);color:var(--ink-dim);padding:6px 13px;border-radius:20px;font-size:.78rem;cursor:pointer;font-family:var(--sans);}
+  .schip:hover{border-color:var(--accent);color:var(--ink);}
+  .schip.on{border-color:var(--accent);color:var(--ink);background:#182233;}
+  .schip b{font-family:var(--mono);font-weight:600;color:var(--ink);}
+  .sdot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+  .status-wrap{max-height:620px;border:1px solid var(--line);border-radius:8px;}
+  #status-table{min-width:880px;}
+  #status-table th{position:sticky;top:0;background:#171f29;z-index:1;line-height:1.35;vertical-align:bottom;padding:10px 10px;border-bottom:1px solid var(--line);}
+  #status-table td{vertical-align:middle;padding:11px 10px;}
   #status-table tbody tr{cursor:pointer;}
+  #status-table tbody tr:last-child td{border-bottom:none;}
   #status-table tbody tr:hover,#status-table tbody tr.sel{background:var(--panel-2);}
-  .sbadge{display:inline-block;padding:2px 9px;border-radius:6px;font-size:.76rem;font-weight:600;border:1px solid transparent;}
+  #status-table td:first-child{padding-left:14px;}
+  #status-table tr.st-red td:first-child{box-shadow:inset 3px 0 0 var(--bad);}
+  #status-table tr.st-green td:first-child{box-shadow:inset 3px 0 0 var(--good);}
+  #status-table tr.st-blue td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
+  #status-table tr.st-grey td:first-child{box-shadow:inset 3px 0 0 var(--line);}
+  #status-table td.zero{color:var(--ink-dim);}
+  .dname{font-weight:600;}
+  .trend-hint{margin-left:10px;color:var(--accent);font-size:.72rem;opacity:0;transition:opacity .12s;}
+  #status-table tbody tr:hover .trend-hint{opacity:1;}
+  .stat-cell{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .sbadge{display:inline-block;padding:2px 10px;border-radius:6px;font-size:.74rem;font-weight:600;border:1px solid transparent;white-space:nowrap;}
   .sb-red{background:#3a1414;border-color:var(--bad);color:var(--bad);}
   .sb-green{background:#123422;border-color:var(--good);color:var(--good);}
   .sb-blue{background:#14233d;border-color:var(--accent);color:var(--accent);}
   .sb-grey{background:var(--panel-2);border-color:var(--line);color:var(--ink-dim);}
-  .sev-ev{font-size:.72rem;color:var(--ink-dim);margin-top:4px;font-family:var(--mono);}
+  .sev-ev{font-size:.72rem;color:var(--ink-dim);font-family:var(--mono);}
+  .modal-back{position:fixed;inset:0;background:rgba(5,8,12,.74);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;}
+  .modal-back.open{display:flex;}
+  .modal-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;width:min(920px,100%);max-height:92vh;overflow:auto;padding:20px 22px 16px;box-shadow:0 20px 50px rgba(0,0,0,.55);}
+  .modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:14px;flex-wrap:wrap;}
+  .modal-title{font-size:1.1rem;font-weight:600;}
+  .modal-sub{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;}
+  .modal-nav{display:flex;gap:6px;align-items:center;}
+  .icon-btn{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:6px 11px;font-size:.8rem;cursor:pointer;font-family:var(--sans);}
+  .icon-btn:hover{border-color:var(--accent);}
 
   #trend{width:100%;height:260px;display:block;}
   .legend{display:flex;gap:18px;margin-top:8px;font-size:.78rem;color:var(--ink-dim);}
@@ -167,33 +196,6 @@
         </div>
       </div>
     </div>
-  </div>
-
-  <div class="panel" id="status-panel">
-    <h2>Domain health, latest week</h2>
-    <div class="status-chips" id="status-chips"></div>
-    <p class="hint" id="status-note">Loading…</p>
-    <div class="table-wrap">
-      <table id="status-table">
-        <thead id="status-head"></thead>
-        <tbody id="status-body"></tbody>
-      </table>
-    </div>
-    <div class="empty" id="status-empty" style="display:none;">No domains match this status.</div>
-    <div style="margin-top:20px;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
-        <div><span id="status-trend-title" style="font-size:.9rem;font-weight:600;"></span><span style="font-size:.75rem;color:var(--ink-dim);margin-left:8px;">weekly reply and bounce rate</span></div>
-        <div class="legend" style="margin-top:0;">
-          <span><i style="background:var(--good);"></i>Reply rate</span>
-          <span><i style="background:var(--bad);"></i>Bounce rate</span>
-        </div>
-      </div>
-      <div style="position:relative;" id="status-trend-wrap">
-        <svg id="status-trend-svg" viewBox="0 0 1120 240" style="width:100%;height:auto;display:block;"></svg>
-        <div id="status-tooltip" style="display:none;position:absolute;background:#1c2530;border:1px solid var(--line);border-radius:6px;padding:8px 11px;font-size:.78rem;font-family:var(--mono);pointer-events:none;white-space:nowrap;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,.4);"></div>
-      </div>
-    </div>
-    <p class="hint" id="status-rules" style="margin:14px 0 0;"></p>
   </div>
 
   <div class="panel">
@@ -277,12 +279,55 @@
     </div>
     <div class="empty" id="table-empty" style="display:none;">No rows match the current filters.</div>
   </div>
+
+  <div class="panel" id="status-panel">
+    <div class="status-head-row">
+      <h2 style="margin:0;">Domain health, latest week</h2>
+      <span class="week-pill" id="status-week"></span>
+    </div>
+    <p class="hint" id="status-note" style="margin:8px 0 14px;">Loading…</p>
+    <div class="status-chips" id="status-chips"></div>
+    <div class="table-wrap status-wrap">
+      <table id="status-table">
+        <colgroup><col style="width:23%"><col style="width:8%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:29%"></colgroup>
+        <thead id="status-head"></thead>
+        <tbody id="status-body"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="status-empty" style="display:none;">No domains match this status.</div>
+    <p class="hint" id="status-rules" style="margin:14px 0 0;"></p>
+  </div>
+</div>
+
+<div class="modal-back" id="status-modal" role="dialog" aria-modal="true" aria-labelledby="status-modal-title">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="status-modal-title"></div>
+        <div class="modal-sub"><span id="status-modal-badge"></span><span class="sev-ev" id="status-modal-ev"></span></div>
+      </div>
+      <div class="modal-nav">
+        <button class="icon-btn" id="status-modal-prev" aria-label="Previous domain">&lsaquo; Prev</button>
+        <button class="icon-btn" id="status-modal-next" aria-label="Next domain">Next &rsaquo;</button>
+        <button class="icon-btn" id="status-modal-close" aria-label="Close">Close &times;</button>
+      </div>
+    </div>
+    <div class="legend" style="margin:0 0 6px;">
+      <span><i style="background:var(--good);"></i>Reply rate</span>
+      <span><i style="background:var(--bad);"></i>Bounce rate</span>
+    </div>
+    <div style="position:relative;" id="status-trend-wrap">
+      <svg id="status-trend-svg" viewBox="0 0 820 260" style="width:100%;height:auto;display:block;"></svg>
+      <div id="status-tooltip" style="display:none;position:absolute;background:#1c2530;border:1px solid var(--line);border-radius:6px;padding:8px 11px;font-size:.78rem;font-family:var(--mono);pointer-events:none;white-space:nowrap;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,.4);"></div>
+    </div>
+    <p class="hint" style="margin:10px 0 0;">Hover a point for the exact counts. Left and right arrow keys move between domains, Esc closes.</p>
+  </div>
 </div>
 
 <script>
 // ---- Fill these in once ----
-const SUPABASE_URL = "https://tuccoyvmlfhqpapbbjta.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_OoWVr9d-APksjIKx_u-44g_5bWLT1dO"; // anon/public key only, never service_role
+const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"; // anon/public key only, never service_role
 // -----------------------------
 
 const BOUNCE_THRESHOLD = 2.0;
@@ -746,6 +791,8 @@ const STATUS_RULES = {
 };
 const STATUS_SEV = { "Burned": 0, "Improving": 1, "Healthy": 2, "Not enough data": 3 };
 const STATUS_CLASS = { "Burned": "sb-red", "Improving": "sb-blue", "Healthy": "sb-green", "Not enough data": "sb-grey" };
+const STATUS_ROW = { "Burned": "st-red", "Improving": "st-blue", "Healthy": "st-green", "Not enough data": "st-grey" };
+const STATUS_DOT = { "Burned": "var(--bad)", "Improving": "var(--accent)", "Healthy": "var(--good)", "Not enough data": "var(--ink-dim)" };
 const STATUS_COLS = [
   { k: "domain", t: "Domain", l: 1 },
   { k: "sent", t: "Sent<br>this week" },
@@ -773,6 +820,10 @@ function shiftWeek(iso, n) {
 }
 
 function fmtPct(v) { return v === null ? "n/a" : v.toFixed(2) + "%"; }
+
+function fmtDay(iso) {
+  return new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
 
 function buildStatus() {
   const R = STATUS_RULES;
@@ -835,19 +886,24 @@ function buildStatus() {
 }
 
 function statusEvidence(r) {
+  let t;
   if (r.status === "Not enough data") {
-    return r.kind === "history"
+    t = r.kind === "history"
       ? "only " + r.weeks + " week" + (r.weeks === 1 ? "" : "s") + " of sends so far"
       : r.a8.sent.toLocaleString() + " sends in 8 wks, need " + STATUS_RULES.MIN_SENDS;
+  } else if (r.kind === "bounce") {
+    t = r.l4.bounced + " bounces in " + r.l4.sent.toLocaleString() + " sends (last 4 wks)";
+  } else {
+    t = r.a8.replied + (r.a8.replied === 1 ? " reply" : " replies") + " in " + r.a8.sent.toLocaleString() + " sends";
+    if (r.status === "Improving") t += " · prev 8 wks: " + r.b8.replied + " in " + r.b8.sent.toLocaleString();
   }
-  if (r.kind === "bounce") return r.l4.bounced + " bounces in " + r.l4.sent.toLocaleString() + " sends (last 4 wks)";
-  return r.a8.replied + (r.a8.replied === 1 ? " reply" : " replies") + " in " + r.a8.sent.toLocaleString() + " sends";
+  return t;
 }
 
 function sortedStatusRows() {
   const a = statusRows.filter(r => !statusFilter || r.status === statusFilter);
   a.sort((p, q) => {
-    let u = p[statusSortKey === "domain" ? "domain" : statusSortKey], v = q[statusSortKey === "domain" ? "domain" : statusSortKey];
+    let u = p[statusSortKey], v = q[statusSortKey];
     if (typeof u === "string") { const c = u.localeCompare(v); if (c) return c * statusSortDir; }
     else { u = u === null ? -1 : u; v = v === null ? -1 : v; if (u !== v) return (u - v) * statusSortDir; }
     return statusSortKey === "sev" ? q.sent - p.sent : 0;
@@ -858,7 +914,8 @@ function sortedStatusRows() {
 function drawStatusTable() {
   const counts = { "Burned": 0, "Improving": 0, "Healthy": 0, "Not enough data": 0 };
   statusRows.forEach(r => counts[r.status]++);
-  const chip = (label, s, n) => '<button class="schip' + (statusFilter === s ? " on" : "") + '" data-s="' + (s || "") + '">' + label + "<b>" + n + "</b></button>";
+  const chip = (label, s, n) => '<button class="schip' + (statusFilter === s ? " on" : "") + '" data-s="' + (s || "") + '">' +
+    (s ? '<span class="sdot" style="background:' + STATUS_DOT[s] + ';"></span>' : "") + label + "<b>" + n + "</b></button>";
   document.getElementById("status-chips").innerHTML =
     chip("All", null, statusRows.length) + Object.keys(STATUS_SEV).map(s => chip(s, s, counts[s])).join("");
 
@@ -869,26 +926,26 @@ function drawStatusTable() {
 
   const rows = sortedStatusRows();
   document.getElementById("status-empty").style.display = rows.length ? "none" : "block";
-  const bad = v => v !== null && v >= BOUNCE_THRESHOLD ? "var(--bad)" : "inherit";
+  const rateCell = (v, danger) => '<td class="num' + (v === null || v === 0 ? " zero" : "") + '"' +
+    (danger && v !== null && v >= BOUNCE_THRESHOLD ? ' style="color:var(--bad);"' : "") + ">" + fmtPct(v) + "</td>";
   document.getElementById("status-body").innerHTML = rows.map(r =>
-    '<tr class="' + (r.domain === statusSel ? "sel" : "") + '" data-d="' + r.domain + '">' +
-    '<td style="font-weight:500;">' + r.domain + "</td>" +
+    '<tr class="' + STATUS_ROW[r.status] + (r.domain === statusSel ? " sel" : "") + '" data-d="' + r.domain + '">' +
+    '<td><span class="dname">' + r.domain + '</span><span class="trend-hint">View trend &rsaquo;</span></td>' +
     '<td class="num">' + r.sent.toLocaleString() + "</td>" +
-    '<td class="num">' + fmtPct(r.rw) + "</td>" +
-    '<td class="num">' + fmtPct(r.r4) + "</td>" +
-    '<td class="num" style="color:' + bad(r.bw) + ';">' + fmtPct(r.bw) + "</td>" +
-    '<td class="num" style="color:' + bad(r.b4) + ';">' + fmtPct(r.b4) + "</td>" +
-    '<td><span class="sbadge ' + STATUS_CLASS[r.status] + '">' + r.status + '</span><div class="sev-ev">' + statusEvidence(r) + "</div>" +
-    (r.status === "Improving" ? '<div class="sev-ev">prev 8 wks: ' + r.b8.replied + " in " + r.b8.sent.toLocaleString() + "</div>" : "") +
-    "</td></tr>"
+    rateCell(r.rw, false) + rateCell(r.r4, false) + rateCell(r.bw, true) + rateCell(r.b4, true) +
+    '<td><div class="stat-cell"><span class="sbadge ' + STATUS_CLASS[r.status] + '">' + r.status + '</span><span class="sev-ev">' + statusEvidence(r) + "</span></div></td></tr>"
   ).join("");
+}
+
+function niceStep(x) {
+  const c = [0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 2.5, 5, 10, 20];
+  return c.find(v => v >= x) || 20;
 }
 
 function drawStatusTrend(domain) {
   const svg = document.getElementById("status-trend-svg");
   const tip = document.getElementById("status-tooltip");
-  document.getElementById("status-trend-title").textContent = domain || "";
-  if (!domain) { svg.innerHTML = ""; return; }
+  tip.style.display = "none";
   const m = statusByDomain.get(domain) || new Map();
   const N = STATUS_RULES.TREND_WEEKS;
   const pts = [];
@@ -900,16 +957,21 @@ function drawStatusTrend(domain) {
   }
   const vals = [];
   pts.forEach(p => { if (p.rr !== null) vals.push(p.rr); if (p.br !== null) vals.push(p.br); });
-  const mx = Math.max(1, ...vals) * 1.15;
-  const W = 1120, H = 240, pl = 46, pr = 16, pt = 12, pb = 30, pw = W - pl - pr, ph = H - pt - pb;
+  const rawMax = Math.max(0.5, ...vals);
+  const step = niceStep(rawMax / 4);
+  const top = Math.ceil(rawMax / step - 1e-9) * step;
+  const dec = Math.abs(Math.round(step * 10) - step * 10) < 1e-9 ? (step >= 1 ? 0 : 1) : 2;
+
+  const W = Math.max(480, Math.round(svg.getBoundingClientRect().width || 820));
+  const H = 260, pl = 50, pr = 16, pt = 14, pb = 32, pw = W - pl - pr, ph = H - pt - pb;
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
   const X = i => pl + i / (N - 1) * pw;
-  const Y = v => pt + ph - v / mx * ph;
+  const Y = v => pt + ph - v / top * ph;
   const txt = "style='fill:var(--ink-dim);font-size:11px;'";
   let out = "";
-  for (let k = 0; k <= 4; k++) {
-    const v = mx / 4 * k;
-    out += "<line x1='" + pl + "' x2='" + (W - pr) + "' y1='" + Y(v) + "' y2='" + Y(v) + "' style='stroke:#1b232d;' stroke-width='1'/>" +
-      "<text x='" + (pl - 8) + "' y='" + (Y(v) + 4) + "' text-anchor='end' " + txt + ">" + v.toFixed(1) + "%</text>";
+  for (let v = 0; v <= top + 1e-9; v += step) {
+    out += "<line x1='" + pl + "' x2='" + (W - pr) + "' y1='" + Y(v) + "' y2='" + Y(v) + "' style='stroke:#222c38;' stroke-width='1'/>" +
+      "<text x='" + (pl - 8) + "' y='" + (Y(v) + 4) + "' text-anchor='end' " + txt + ">" + v.toFixed(dec) + "%</text>";
   }
   const every = Math.ceil(N / 10);
   pts.forEach((p, i) => {
@@ -931,7 +993,7 @@ function drawStatusTrend(domain) {
       const p = pts[+h.dataset.i];
       const wr = document.getElementById("status-trend-wrap").getBoundingClientRect();
       tip.style.display = "block";
-      tip.style.left = Math.max(0, Math.min(e.clientX - wr.left + 12, wr.width - 220)) + "px";
+      tip.style.left = Math.max(0, Math.min(e.clientX - wr.left + 12, wr.width - 230)) + "px";
       tip.style.top = Math.max(0, e.clientY - wr.top - 70) + "px";
       tip.innerHTML = "<div style='color:var(--ink-dim);margin-bottom:4px;'>Week of " + p.w + "</div>" + (p.sent === 0
         ? "<div>No sends this week</div>"
@@ -940,6 +1002,39 @@ function drawStatusTrend(domain) {
     });
     h.addEventListener("mouseleave", () => { tip.style.display = "none"; });
   });
+}
+
+function statusModalOpen() { return document.getElementById("status-modal").classList.contains("open"); }
+
+function openStatusModal(domain) {
+  const r = statusRows.find(x => x.domain === domain);
+  if (!r) return;
+  statusSel = domain;
+  document.getElementById("status-modal-title").textContent = domain;
+  document.getElementById("status-modal-badge").innerHTML = '<span class="sbadge ' + STATUS_CLASS[r.status] + '">' + r.status + "</span>";
+  document.getElementById("status-modal-ev").textContent = statusEvidence(r);
+  document.getElementById("status-modal").classList.add("open");
+  document.body.style.overflow = "hidden";
+  drawStatusTrend(domain);
+  document.querySelectorAll("#status-body tr").forEach(tr => {
+    const on = tr.dataset.d === domain;
+    tr.classList.toggle("sel", on);
+    if (on) tr.scrollIntoView({ block: "nearest" });
+  });
+  document.getElementById("status-modal-close").focus();
+}
+
+function closeStatusModal() {
+  document.getElementById("status-modal").classList.remove("open");
+  document.body.style.overflow = "";
+  document.getElementById("status-tooltip").style.display = "none";
+}
+
+function stepStatusModal(delta) {
+  const rows = sortedStatusRows();
+  if (!rows.length) return;
+  const i = rows.findIndex(r => r.domain === statusSel);
+  openStatusModal(rows[(i + delta + rows.length) % rows.length].domain);
 }
 
 function renderStatusSection() {
@@ -952,9 +1047,10 @@ function renderStatusSection() {
     return;
   }
   const lastRow = DOMAIN_ROWS.find(r => r.week_start === statusLatest);
-  note.textContent = "Latest week: " + statusLatest + " to " + (lastRow && lastRow.week_end ? lastRow.week_end : "") +
-    ". Click a domain to see its weekly trend, or click a column header to sort. " +
-    statusHidden + " domains with no sends this week are not shown.";
+  const endIso = lastRow && lastRow.week_end ? lastRow.week_end : shiftWeek(statusLatest, 1);
+  document.getElementById("status-week").textContent = fmtDay(statusLatest) + " to " + fmtDay(endIso) + ", " + endIso.slice(0, 4);
+  note.textContent = "Click a domain to open its weekly trend, or click a column header to sort. " +
+    statusHidden + " domains with no sends this week are hidden.";
   const fleetPct = statusFleet * 100, floorPct = fleetPct * STATUS_RULES.FLOOR_MULT;
   document.getElementById("status-rules").textContent =
     "Status uses the last 8 weeks. Burned: reply rate below half the fleet average (" + floorPct.toFixed(2) + "% now, fleet average " + fleetPct.toFixed(2) +
@@ -962,9 +1058,7 @@ function renderStatusSection() {
     "x the 8 weeks before, with " + STATUS_RULES.IMPROVE_MIN_REPLIES + " or more replies. Not enough data: under " + STATUS_RULES.MIN_SENDS +
     " sends in 8 weeks. Everything else is Healthy. With only a few replies per domain, treat Burned as a watch list.";
 
-  if (!statusSel || !statusRows.some(r => r.domain === statusSel)) statusSel = sortedStatusRows()[0].domain;
   drawStatusTable();
-  drawStatusTrend(statusSel);
 
   if (!statusWired) {
     statusWired = true;
@@ -984,11 +1078,21 @@ function renderStatusSection() {
     });
     document.getElementById("status-body").addEventListener("click", e => {
       const tr = e.target.closest("tr");
-      if (!tr) return;
-      statusSel = tr.dataset.d;
-      drawStatusTable();
-      drawStatusTrend(statusSel);
+      if (tr) openStatusModal(tr.dataset.d);
     });
+    document.getElementById("status-modal-close").addEventListener("click", closeStatusModal);
+    document.getElementById("status-modal-prev").addEventListener("click", () => stepStatusModal(-1));
+    document.getElementById("status-modal-next").addEventListener("click", () => stepStatusModal(1));
+    document.getElementById("status-modal").addEventListener("click", e => {
+      if (e.target.id === "status-modal") closeStatusModal();
+    });
+    document.addEventListener("keydown", e => {
+      if (!statusModalOpen()) return;
+      if (e.key === "Escape") closeStatusModal();
+      else if (e.key === "ArrowLeft") { e.preventDefault(); stepStatusModal(-1); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); stepStatusModal(1); }
+    });
+    window.addEventListener("resize", () => { if (statusModalOpen() && statusSel) drawStatusTrend(statusSel); });
   }
 }
 // ---- STATUS SECTION END
